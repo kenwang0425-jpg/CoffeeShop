@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>精品烘焙咖啡電商網站 - 首頁</title>
+  <!-- Bootstrap 5 CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+  <!-- Bootstrap Icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+  <!-- Google Fonts -->
+  <link
+    href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Noto+Sans+TC:wght@300;400;500;700&display=swap"
+    rel="stylesheet">
+  <!-- Custom Styles -->
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body>
+
+  <!-- 頂部導覽列 (Navbar) -->
+  <nav
+    class="navbar navbar-expand-lg navbar-light bg-dark-transparent py-3 fixed-top border-bottom border-light-subtle">
+    <div class="container">
+      <a class="navbar-brand d-flex align-items-center logo-premium" href="#">
+        <i class="bi bi-cup-hot-fill me-2 text-warning"></i>
+        <span>KAKAMA COFFEE</span>
+      </a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+        aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav ms-auto align-items-center gap-3">
+          <li class="nav-item">
+            <a class="nav-link active" href="#">首頁</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#catalog-section">精品咖啡豆</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="/login.html"><i class="bi bi-shield-lock me-1"></i>後台管理</a>
+          </li>
+          <!-- 購物車按鈕 -->
+          <li class="nav-item ms-lg-2">
+            <button class="btn btn-outline-warning position-relative d-flex align-items-center gap-2 px-3"
+              id="btn-cart">
+              <i class="bi bi-cart3"></i>
+              <span>購物車</span>
+              <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none"
+                id="cart-badge">
+                0
+              </span>
+            </button>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero 區塊 -->
+  <header class="hero-section">
+    <div class="hero-overlay"></div>
+    <div class="container hero-content text-center">
+      <span
+        class="badge bg-warning text-dark px-3 py-2 fs-6 mb-3 rounded-pill fw-bold text-uppercase tracking-wider">Premium
+        Coffee Roasters</span>
+      <h1 class="hero-title mb-4">探索精品咖啡的極致芬芳</h1>
+      <p class="hero-subtitle mb-5 mx-auto">我們精選全球知名莊園咖啡豆，以職人精神精心烘焙，將每個產區獨特的水果香甜、堅果醇厚與悠長餘韻完美呈現。</p>
+      <a href="#catalog-section"
+        class="btn btn-warning-custom btn-lg px-5 py-3 fw-bold rounded-pill shadow-lg hover-scale">
+        <i class="bi bi-search me-2"></i>瀏覽今日精品豆
+      </a>
+    </div>
+  </header>
+
+  <!-- 本月限量掛耳包組預購區塊 -->
+  <section class="py-5 border-bottom border-light-subtle" id="preorder-section" style="background-color: #FDFBF7;">
+    <div class="container py-4">
+      <div class="text-center mb-5">
+        <h2 class="section-title" style="color: #332214 !important;">本月限量掛耳包組預購</h2>
+        <div class="title-underline mx-auto"></div>
+        <p class="text-warning mt-3 fs-5 fw-bold">每月底推出下個月的總合組，先訂先贏，賣完為止！</p>
+      </div>
+
+      <div class="row g-4 justify-content-center">
+        <!-- 中烘焙組 -->
+        <div class="col-12 col-md-6 col-lg-5 d-flex">
+          <div class="card coffee-card w-100 flex-column d-flex justify-content-between position-relative">
+            <span
+              class="badge bg-danger position-absolute top-0 start-0 m-3 px-3 py-2 fw-bold text-uppercase fs-7 shadow">限量預購</span>
+            <div class="card-body p-4 d-flex flex-column justify-content-between">
+              <div>
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <span class="badge bg-dark-amber text-warning px-2 py-1 fs-8 rounded">綜合掛耳</span>
+                </div>
+                <h3 class="card-title h5 text-dark fw-bold mb-3">中烘焙組 (10包/組)</h3>
+                <p class="card-text text-secondary italic-flavor mb-4">
+                  內含5種精品豆各2包，適合喜歡堅果醇厚與焦糖甜感的您。
+                </p>
+              </div>
+
+              <div class="price-spec-box mt-auto">
+                <div class="spec-header text-secondary mb-2 fs-8 text-uppercase tracking-wider">規格選擇 & 價格</div>
+                <div class="d-flex flex-column gap-2">
+                  <div class="d-flex align-items-center justify-content-between py-2 border-bottom border-light-subtle">
+                    <div class="d-flex align-items-center">
+                      <span class="fw-semibold text-secondary me-2 fs-7">每組</span>
+                      <span class="text-warning-custom fw-bold">NT$ 185</span>
+                    </div>
+                    <button class="btn btn-warning-custom btn-xs px-2.5 py-1 text-dark fw-bold btn-add-to-cart"
+                      data-id="PRE-01" data-name="中烘焙組 (10包/組)" data-size="每組" data-price="185">
+                      <i class="bi bi-cart-plus-fill me-1"></i>預購
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 中淺焙組 -->
+        <div class="col-12 col-md-6 col-lg-5 d-flex">
+          <div class="card coffee-card w-100 flex-column d-flex justify-content-between position-relative">
+            <span
+              class="badge bg-danger position-absolute top-0 start-0 m-3 px-3 py-2 fw-bold text-uppercase fs-7 shadow">限量預購</span>
+            <div class="card-body p-4 d-flex flex-column justify-content-between">
+              <div>
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <span class="badge bg-dark-amber text-warning px-2 py-1 fs-8 rounded">綜合掛耳</span>
+                </div>
+                <h3 class="card-title h5 text-dark fw-bold mb-3">中淺焙組 (10包/組)</h3>
+                <p class="card-text text-secondary italic-flavor mb-4">
+                  內含5種精品豆各2包，適合喜歡水果酸甜與優雅花香的您。
+                </p>
+              </div>
+
+              <div class="price-spec-box mt-auto">
+                <div class="spec-header text-secondary mb-2 fs-8 text-uppercase tracking-wider">規格選擇 & 價格</div>
+                <div class="d-flex flex-column gap-2">
+                  <div class="d-flex align-items-center justify-content-between py-2 border-bottom border-light-subtle">
+                    <div class="d-flex align-items-center">
+                      <span class="fw-semibold text-secondary me-2 fs-7">每組</span>
+                      <span class="text-warning-custom fw-bold">NT$ 195</span>
+                    </div>
+                    <button class="btn btn-warning-custom btn-xs px-2.5 py-1 text-dark fw-bold btn-add-to-cart"
+                      data-id="PRE-02" data-name="中淺焙組 (10包/組)" data-size="每組" data-price="195">
+                      <i class="bi bi-cart-plus-fill me-1"></i>預購
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 商品目錄區塊 (Catalog Section) -->
+  <section class="py-5" id="catalog-section">
+    <div class="container py-4">
+      <div class="text-center mb-5">
+        <h2 class="section-title">嚴選精品咖啡豆</h2>
+        <div class="title-underline mx-auto"></div>
+        <p class="text-secondary mt-3 fs-5">所有品項皆為新鮮烘焙，真空保鮮包裝，確保極致風味呈現。</p>
+      </div>
+
+      <!-- 篩選與搜尋列 -->
+      <div class="row g-3 justify-content-between align-items-center mb-5 glass-filter p-4 rounded-4">
+        <div class="col-12 col-md-6 col-lg-4">
+          <div class="input-group">
+            <span class="input-group-text bg-light border-secondary text-secondary"><i class="bi bi-search"></i></span>
+            <input type="text" class="form-control form-control-custom" id="search-beans" placeholder="搜尋國家、莊園或風味...">
+          </div>
+        </div>
+        <div class="col-12 col-md-auto d-flex gap-2 flex-wrap">
+          <button class="btn btn-outline-warning btn-sm active px-3 filter-btn" data-method="all">全部處理法</button>
+          <button class="btn btn-outline-warning btn-sm px-3 filter-btn" data-method="日曬">日曬</button>
+          <button class="btn btn-outline-warning btn-sm px-3 filter-btn" data-method="水洗">水洗</button>
+          <button class="btn btn-outline-warning btn-sm px-3 filter-btn" data-method="蜜處理">蜜處理/其他</button>
+        </div>
+      </div>
+
+      <!-- 載入狀態 -->
+      <div class="text-center py-5" id="catalog-loading">
+        <div class="spinner-border text-warning" role="status" style="width: 3rem; height: 3rem;">
+          <span class="visually-hidden">載入中...</span>
+        </div>
+        <p class="text-secondary mt-3">正在為您搜羅新鮮烘焙的精品咖啡豆...</p>
+      </div>
+
+      <!-- 商品網格 -->
+      <div class="row g-4 d-none" id="catalog-grid">
+        <!-- 由 JS 動態生成商品卡片 -->
+      </div>
+
+      <!-- 無商品狀態 -->
+      <div class="text-center py-5 d-none" id="catalog-empty">
+        <i class="bi bi-cup-hot text-secondary mb-3" style="font-size: 4rem;"></i>
+        <h4 class="text-secondary">目前沒有符合篩選條件的咖啡豆</h4>
+        <p class="text-muted">您可以嘗試調整搜尋關鍵字或選擇其他處理法。</p>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- 側滑式購物車抽屜 (Cart Slide-over Drawer) -->
+  <div class="cart-drawer-overlay" id="cart-drawer-overlay"></div>
+  <div class="cart-drawer" id="cart-drawer">
+    <div class="cart-header d-flex justify-content-between align-items-center p-4 border-bottom border-secondary">
+      <h5 class="mb-0 fw-bold d-flex align-items-center gap-2 text-dark">
+        <i class="bi bi-cart3 text-warning"></i>您的購物清單
+      </h5>
+      <button class="btn-close" id="btn-close-cart" aria-label="Close"></button>
+    </div>
+
+    <!-- 購物車商品列表 -->
+    <div class="cart-body p-4" id="cart-items-container">
+      <!-- 由 JS 動態填入商品項目 -->
+    </div>
+
+    <!-- 購物車結算區 -->
+    <div class="cart-footer p-4 border-top border-secondary">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <span class="text-secondary">小計</span>
+        <span class="fs-4 fw-bold text-warning-custom" id="cart-subtotal">NT$ 0</span>
+      </div>
+      <button class="btn btn-warning-custom w-100 py-3 fw-bold rounded-3 mb-2" id="btn-checkout" disabled>
+        確認結帳
+      </button>
+      <button class="btn btn-outline-secondary w-100 py-2 btn-sm" id="btn-clear-cart">
+        清空購物車
+      </button>
+    </div>
+  </div>
+
+  <!-- 結帳成功 Toast 提示 -->
+  <div class="toast-container position-fixed bottom-0 end-0 p-3">
+    <div id="checkout-toast" class="toast align-items-center text-bg-success border-0" role="alert"
+      aria-live="assertive" aria-atomic="true">
+      <div class="d-flex">
+        <div class="toast-body">
+          <i class="bi bi-check-circle-fill me-2"></i> 訂單已成功送出！感謝您的訂購。
+        </div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"
+          aria-label="Close"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="bg-light text-secondary py-5 border-top border-secondary mt-5">
+    <div class="container text-center">
+      <div class="d-flex justify-content-center align-items-center gap-2 mb-3">
+        <i class="bi bi-cup-hot-fill text-warning fs-4"></i>
+        <span class="text-dark fw-bold fs-5">KAKAMA COFFEE 精品烘焙咖啡</span>
+      </div>
+      <p class="mb-2 text-dark">專業烘焙 ‧ 產地直送 ‧ 品質保證</p>
+      <p class="small text-muted mb-0">© 2026 KAKAMA COFFEE. All rights reserved. 版權所有，翻印必究。</p>
+    </div>
+  </footer>
+
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- Store Frontpage Logic -->
+  <script src="/js/store.js"></script>
+</body>
+
+</html>

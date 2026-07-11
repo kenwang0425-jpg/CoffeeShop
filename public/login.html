@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>精品咖啡後台管理系統 - 登入</title>
+  <!-- Bootstrap 5 CSS CDN -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+  <!-- Icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+  <!-- Custom Styles -->
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="login-body">
+
+  <div class="login-card">
+    <div class="login-logo">
+      <i class="bi bi-cup-hot-fill me-2"></i>KAKAMA COFFEE Admin
+    </div>
+    
+    <p class="text-center text-secondary mb-4">請輸入管理員帳號與密碼以登入系統</p>
+
+    <!-- 錯誤訊息提示區 -->
+    <div id="error-alert" class="alert alert-danger d-none d-flex align-items-center mb-4" role="alert">
+      <i class="bi bi-exclamation-triangle-fill me-2"></i>
+      <span id="error-message">帳號或密碼錯誤！</span>
+    </div>
+
+    <form id="login-form" novalidate>
+      <!-- 帳號欄位 -->
+      <div class="mb-4">
+        <label for="username" class="form-label form-label-custom">使用者帳號</label>
+        <div class="input-group">
+          <span class="input-group-text bg-dark border-secondary text-secondary"><i class="bi bi-person-fill"></i></span>
+          <input type="text" class="form-control form-control-custom" id="username" placeholder="請輸入帳號" required autocomplete="username">
+        </div>
+        <div class="invalid-feedback-custom" id="username-feedback">請輸入您的帳號</div>
+      </div>
+
+      <!-- 密碼欄位 -->
+      <div class="mb-4">
+        <label for="password" class="form-label form-label-custom">密碼</label>
+        <div class="input-group">
+          <span class="input-group-text bg-dark border-secondary text-secondary"><i class="bi bi-lock-fill"></i></span>
+          <input type="password" class="form-control form-control-custom" id="password" placeholder="請輸入密碼" required autocomplete="current-password">
+        </div>
+        <div class="invalid-feedback-custom" id="password-feedback">請輸入您的密碼</div>
+      </div>
+
+      <!-- 登入按鈕 -->
+      <div class="d-grid mt-5">
+        <button type="submit" class="btn btn-custom-primary btn-lg" id="btn-login">
+          <span id="btn-login-text">登入系統</span>
+          <span id="btn-login-spinner" class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+        </button>
+      </div>
+    </form>
+    
+    <div class="text-center mt-4">
+      <small class="text-secondary">測試預設帳號：<code class="text-info">admin</code> / 密碼：<code class="text-info">password</code></small>
+    </div>
+  </div>
+
+  <!-- BootStrap JS Bundle -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- Custom Login script -->
+  <script src="/js/auth.js"></script>
+</body>
+</html>

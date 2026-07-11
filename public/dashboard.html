@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KAKAMA COFFEE 後台管理系統</title>
+  <script>
+    if (!sessionStorage.getItem('token')) { window.location.href = '/login.html'; }
+  </script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+  <div class="app-container">
+    <!-- 側邊欄 -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-brand">
+          <i class="bi bi-cup-hot-fill me-2"></i>KAKAMA Admin
+        </div>
+      </div>
+      <ul class="sidebar-menu">
+        <li class="menu-item active">
+          <a href="#" id="menu-products">
+            <i class="bi bi-grid-1x2-fill"></i>
+            <span>商品管理</span>
+          </a>
+        </li>
+      </ul>
+      <div class="sidebar-footer">
+        <div class="user-profile">
+          <div class="avatar-placeholder" id="user-avatar">A</div>
+          <div class="user-info">
+            <div class="user-name" id="user-display-name">Admin</div>
+            <div class="user-role">系統管理員</div>
+          </div>
+        </div>
+        <button class="btn btn-outline-danger btn-sm w-100 mt-2" id="btn-logout">
+          <i class="bi bi-box-arrow-right me-2"></i>登出系統
+        </button>
+      </div>
+    </aside>
+
+    <!-- 主內容區 -->
+    <main class="main-content">
+      <header class="main-header">
+        <h1 class="page-title">商品管理</h1>
+        <div class="d-flex align-items-center gap-3">
+          <span class="text-secondary d-none d-md-inline" id="header-welcome">歡迎回來，系統管理員</span>
+          <button class="btn btn-sm btn-outline-secondary d-md-none" id="btn-logout-mobile">
+            <i class="bi bi-box-arrow-right"></i>
+          </button>
+        </div>
+      </header>
+
+      <section class="content-body">
+        <!-- 全域訊息提示 -->
+        <div id="global-alert" class="alert alert-success d-none alert-dismissible fade show" role="alert">
+          <i class="bi bi-check-circle-fill me-2" id="alert-icon"></i>
+          <span id="global-alert-message">作業成功！</span>
+          <button type="button" class="btn-close btn-close-white-custom" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+
+        <div class="glass-card">
+          <!-- 搜尋 & 新增 -->
+          <div class="row g-3 justify-content-between align-items-center mb-4">
+            <div class="col-12 col-md-4">
+              <div class="input-group">
+                <span class="input-group-text bg-dark border-secondary text-secondary"><i class="bi bi-search"></i></span>
+                <input type="text" class="form-control form-control-custom" id="search-input" placeholder="搜尋商品...">
+              </div>
+            </div>
+            <!-- 類別快速篩選 -->
+            <div class="col-12 col-md-auto d-flex gap-2 flex-wrap align-items-center">
+              <button class="btn btn-outline-warning btn-sm px-3 filter-tab active" data-cat="all">全部</button>
+              <button class="btn btn-outline-warning btn-sm px-3 filter-tab" data-cat="咖啡豆">🫘 咖啡豆</button>
+              <button class="btn btn-outline-warning btn-sm px-3 filter-tab" data-cat="掛耳包組">👂 掛耳包組</button>
+              <button class="btn btn-outline-warning btn-sm px-3 filter-tab" data-cat="周邊產品">🎁 周邊產品</button>
+              <button class="btn btn-custom-primary d-flex align-items-center gap-2" id="btn-add-product">
+                <i class="bi bi-plus-circle-fill"></i><span>新增商品</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Loading -->
+          <div class="text-center py-5 d-none" id="loading-spinner">
+            <div class="spinner-border text-info" role="status" style="width:3rem;height:3rem;"></div>
+            <p class="text-secondary mt-3">正在載入商品資料...</p>
+          </div>
+
+          <!-- 產品列表表格 -->
+          <div class="table-responsive" id="table-container">
+            <table class="table custom-table">
+              <thead>
+                <tr>
+                  <th style="width:10%">商品編號</th>
+                  <th style="width:10%">類別</th>
+                  <th style="width:25%">商品名稱</th>
+                  <th style="width:25%">說明/風味</th>
+                  <th style="width:18%">規格 & 價格</th>
+                  <th style="width:7%">庫存</th>
+                  <th style="width:5%" class="text-center">操作</th>
+                </tr>
+              </thead>
+              <tbody id="product-list-body"></tbody>
+            </table>
+          </div>
+
+          <!-- 無資料 -->
+          <div class="text-center py-5 d-none" id="empty-state">
+            <i class="bi bi-box2-fill text-secondary mb-3" style="font-size:3.5rem;"></i>
+            <h5 class="text-secondary">目前沒有任何商品資料</h5>
+            <p class="text-muted">點選右上方「新增商品」按鈕來建立第一筆商品！</p>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- ===== 新增/修改商品 Modal ===== -->
+  <div class="modal fade" id="product-modal" data-bs-backdrop="static" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content modal-content-custom">
+        <div class="modal-header modal-header-custom">
+          <h5 class="modal-title modal-title-custom" id="product-modal-title">新增商品</h5>
+          <button type="button" class="btn-close btn-close-white-custom" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <form id="product-form" novalidate>
+          <div class="modal-body p-4">
+
+            <!-- ── 列 1：商品編號 & 類別 ── -->
+            <div class="row g-3 mb-3">
+              <div class="col-12 col-md-4">
+                <label for="product-id" class="form-label form-label-custom">商品編號 <span class="text-danger">*</span></label>
+                <input type="text" class="form-control form-control-custom" id="product-id" placeholder="如: CO135" required>
+                <div class="invalid-feedback-custom" id="product-id-feedback">商品編號為必填。</div>
+                <small class="text-muted d-block mt-1" id="product-code-help">編號儲存後不可修改。</small>
+              </div>
+              <div class="col-12 col-md-4">
+                <label for="product-category" class="form-label form-label-custom">商品類別 <span class="text-danger">*</span></label>
+                <select class="form-select form-control-custom" id="product-category" required>
+                  <option value="">── 請選擇類別 ──</option>
+                  <option value="咖啡豆">🫘 咖啡豆</option>
+                  <option value="掛耳包組">👂 掛耳包組</option>
+                  <option value="周邊產品">🎁 周邊產品</option>
+                </select>
+                <div class="invalid-feedback-custom" id="product-category-feedback">請選擇商品類別。</div>
+              </div>
+              <div class="col-12 col-md-4 d-flex align-items-end pb-1">
+                <div class="form-check ms-2">
+                  <input class="form-check-input" type="checkbox" id="product-is-limited">
+                  <label class="form-check-label form-label-custom" for="product-is-limited">🔥 限量商品</label>
+                </div>
+              </div>
+            </div>
+
+            <!-- ── 咖啡豆專用欄位 ── -->
+            <div id="fields-coffee-bean" class="d-none">
+              <hr class="border-secondary my-3">
+              <p class="text-info fs-8 mb-2 fw-bold text-uppercase tracking-wider"><i class="bi bi-cup-hot me-1"></i>咖啡豆資訊</p>
+              <div class="row g-3 mb-3">
+                <div class="col-12 col-md-4">
+                  <label for="product-origin" class="form-label form-label-custom">產區 (國家) <span class="text-danger">*</span></label>
+                  <input type="text" class="form-control form-control-custom" id="product-origin" placeholder="如: 衣索比亞">
+                  <div class="invalid-feedback-custom" id="product-origin-feedback">咖啡豆必須填寫產區。</div>
+                </div>
+                <div class="col-12 col-md-4">
+                  <label for="product-estate" class="form-label form-label-custom">處理莊園</label>
+                  <input type="text" class="form-control form-control-custom" id="product-estate" placeholder="如: 耶加雪菲 歌迪貝">
+                </div>
+                <div class="col-12 col-md-4">
+                  <label for="product-process-method" class="form-label form-label-custom">處理法</label>
+                  <input type="text" class="form-control form-control-custom" id="product-process-method" placeholder="如: 日曬、水洗">
+                </div>
+              </div>
+              <div class="mb-3">
+                <label for="product-name-preview" class="form-label form-label-custom text-info">商品名稱預覽（自動組合）</label>
+                <input type="text" class="form-control form-control-custom" id="product-name-preview" disabled readonly style="opacity:0.7;">
+              </div>
+            </div>
+
+            <!-- ── 掛耳包/周邊 專用欄位 ── -->
+            <div id="fields-brand" class="d-none">
+              <hr class="border-secondary my-3">
+              <p class="text-info fs-8 mb-2 fw-bold text-uppercase tracking-wider"><i class="bi bi-tag me-1"></i>品牌 / 規格資訊</p>
+              <div class="row g-3 mb-3">
+                <div class="col-12 col-md-6">
+                  <label for="product-brand" class="form-label form-label-custom">品牌 / 烘焙度</label>
+                  <input type="text" class="form-control form-control-custom" id="product-brand" placeholder="如: 中烘焙 或 KAKAMA COFFEE">
+                </div>
+                <div class="col-12 col-md-6" id="field-package-notes-wrap">
+                  <label for="product-package-notes" class="form-label form-label-custom">內容物說明</label>
+                  <input type="text" class="form-control form-control-custom" id="product-package-notes" placeholder="如: 10包/組，內含5種各2包">
+                </div>
+              </div>
+            </div>
+
+            <!-- ── 多規格價格 (共用) ── -->
+            <hr class="border-secondary my-3">
+            <p class="text-info fs-8 mb-2 fw-bold text-uppercase tracking-wider"><i class="bi bi-cash-stack me-1"></i>規格 & 價格</p>
+            <div class="row g-2 mb-1 align-items-center">
+              <div class="col-4"><small class="text-secondary">規格名稱</small></div>
+              <div class="col-4"><small class="text-secondary">售價 (NT$)</small></div>
+              <div class="col-4"></div>
+            </div>
+            <!-- 規格 1 -->
+            <div class="row g-2 mb-2 align-items-center">
+              <div class="col-4">
+                <input type="text" class="form-control form-control-custom" id="product-unit-1" placeholder="如: 半磅、每組" required>
+                <div class="invalid-feedback-custom" id="product-unit-1-feedback">規格一名稱為必填。</div>
+              </div>
+              <div class="col-4">
+                <input type="number" class="form-control form-control-custom" id="product-price-1" placeholder="必填，> 0" min="1" required>
+                <div class="invalid-feedback-custom" id="product-price-1-feedback">價格必須大於 0。</div>
+              </div>
+              <div class="col-4"><span class="badge bg-danger fs-9">必填規格</span></div>
+            </div>
+            <!-- 規格 2 -->
+            <div class="row g-2 mb-2 align-items-center">
+              <div class="col-4">
+                <input type="text" class="form-control form-control-custom" id="product-unit-2" placeholder="如: 一磅（選填）">
+              </div>
+              <div class="col-4">
+                <input type="number" class="form-control form-control-custom" id="product-price-2" placeholder="選填，> 0" min="1">
+                <div class="invalid-feedback-custom" id="product-price-2-feedback">價格必須大於 0。</div>
+              </div>
+              <div class="col-4"><span class="badge bg-secondary fs-9">選填規格</span></div>
+            </div>
+            <!-- 規格 3 -->
+            <div class="row g-2 mb-3 align-items-center">
+              <div class="col-4">
+                <input type="text" class="form-control form-control-custom" id="product-unit-3" placeholder="如: 耳掛（選填）">
+              </div>
+              <div class="col-4">
+                <input type="number" class="form-control form-control-custom" id="product-price-3" placeholder="選填，> 0" min="1">
+                <div class="invalid-feedback-custom" id="product-price-3-feedback">價格必須大於 0。</div>
+              </div>
+              <div class="col-4"><span class="badge bg-secondary fs-9">選填規格</span></div>
+            </div>
+
+            <!-- ── 原價/特價 & 庫存 ── -->
+            <div class="row g-3 mb-3">
+              <div class="col-12 col-md-4">
+                <label for="product-original-price" class="form-label form-label-custom">原價 (選填)</label>
+                <div class="input-group">
+                  <span class="input-group-text bg-dark border-secondary text-secondary">NT$</span>
+                  <input type="number" class="form-control form-control-custom" id="product-original-price" placeholder="如: 350" min="1">
+                </div>
+                <div class="invalid-feedback-custom" id="product-original-price-feedback">原價必須大於 0。</div>
+              </div>
+              <div class="col-12 col-md-4">
+                <label for="product-sale-price" class="form-label form-label-custom">特價 (選填)</label>
+                <div class="input-group">
+                  <span class="input-group-text bg-dark border-secondary text-secondary">NT$</span>
+                  <input type="number" class="form-control form-control-custom" id="product-sale-price" placeholder="如: 280" min="1">
+                </div>
+                <div class="invalid-feedback-custom" id="product-sale-price-feedback">特價必須 > 0 且不高於原價。</div>
+              </div>
+              <div class="col-12 col-md-4">
+                <label for="product-stock" class="form-label form-label-custom">庫存 <span class="text-danger">*</span></label>
+                <input type="number" class="form-control form-control-custom" id="product-stock" value="0" min="0" required>
+                <div class="invalid-feedback-custom" id="product-stock-feedback">庫存必須 ≥ 0 的整數。</div>
+              </div>
+            </div>
+
+            <!-- ── 風味/商品描述 ── -->
+            <div class="mb-3">
+              <label for="product-flavor" class="form-label form-label-custom">風味描述 / 商品說明</label>
+              <textarea class="form-control form-control-custom" id="product-flavor" rows="3" placeholder="如: 藍莓、茉莉花香、蜂蜜甜感..."></textarea>
+            </div>
+
+          </div>
+          <div class="modal-footer modal-footer-custom">
+            <button type="button" class="btn btn-outline-secondary px-4" data-bs-dismiss="modal">取消</button>
+            <button type="submit" class="btn btn-custom-primary px-4" id="btn-save-product">
+              <span id="btn-save-text">儲存</span>
+              <span id="btn-save-spinner" class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- 刪除確認 Modal -->
+  <div class="modal fade" id="delete-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+      <div class="modal-content modal-content-custom">
+        <div class="modal-header modal-header-custom border-0 pb-0">
+          <h5 class="modal-title modal-title-custom text-danger"><i class="bi bi-exclamation-triangle-fill me-2"></i>確認刪除</h5>
+          <button type="button" class="btn-close btn-close-white-custom" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body p-4">
+          確認要刪除商品編號 <strong id="delete-target-code" class="text-info"></strong> 嗎？此動作無法復原。
+        </div>
+        <div class="modal-footer modal-footer-custom border-0 pt-0 justify-content-between">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="button" class="btn btn-danger px-4" id="btn-confirm-delete">確認刪除</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/js/app.js"></script>
+</body>
+</html>
