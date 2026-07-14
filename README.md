@@ -1,8 +1,8 @@
-# ProductSystem
+# CoffeeShop
 體驗 AI 如何處理「全端（Frontend + Backend + Database）」的連動，我建議我們現在直接開啟一個全新的專案，你可以按照以下步驟跟 Antigravity 的 AI Agent 協同開發：
 
 🛠️ 第一步：準備全新的工作基地
-在電腦裡建立一個全新的空資料夾，例如：D:\Antigravity\ProductSystem。
+在電腦裡建立一個全新的空資料夾，例如：D:\Antigravity\CoffeeShop。
 
 在 Antigravity 中點選 File -> Open Folder，開啟這個新資料夾。
 既然你是專業的，你可以用更精準的架構指令來引導 AI。請直接在右側的 Agent 框裡，複製並輸入以下這段極具專業氛圍的 Prompt：
