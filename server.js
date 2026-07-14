@@ -18,9 +18,11 @@ app.use(express.static(path.join(__dirname, 'public')));
 // 載入 API 路由
 const authRoutes = require('./routes/auth');
 const productRoutes = require('./routes/products');
+const adminRoutes = require('./routes/admin');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
+app.use('/api/admin', adminRoutes);
 
 // 預設路由重導向 (首頁即登入頁)
 app.get('/', (req, res) => {

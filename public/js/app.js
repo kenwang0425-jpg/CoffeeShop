@@ -57,6 +57,29 @@ document.addEventListener('DOMContentLoaded', () => {
   const fieldsCoffeeBean    = document.getElementById('fields-coffee-bean');
   const fieldsBrand         = document.getElementById('fields-brand');
   const fieldPackageNotesWrap = document.getElementById('field-package-notes-wrap');
+  const fieldsDripbagRecipes= document.getElementById('fields-dripbag-recipes');
+  const recipeListContainer = document.getElementById('recipe-list-container');
+  const recipeDuplicateFeedback = document.getElementById('recipe-duplicate-feedback');
+
+  // Sidebar & Sections
+  const menuProducts        = document.getElementById('menu-products');
+  const menuOrdering        = document.getElementById('menu-ordering');
+  const menuBusinessHours   = document.getElementById('menu-business-hours');
+  const sectionProducts     = document.getElementById('section-products');
+  const sectionOrdering     = document.getElementById('section-ordering');
+  const sectionBusinessHours= document.getElementById('section-business-hours');
+  const pageTitle           = document.querySelector('.page-title');
+
+  // Ordering Guide
+  const orderingMainDesc    = document.getElementById('ordering-main-desc');
+  const orderingItemsContainer = document.getElementById('ordering-items-container');
+  const btnAddOrderingItem  = document.getElementById('btn-add-ordering-item');
+  const btnSaveOrdering     = document.getElementById('btn-save-ordering');
+
+  // Business Hours
+  const businessAnnouncement  = document.getElementById('business-announcement');
+  const businessDaysContainer = document.getElementById('business-days-container');
+  const btnSaveBusinessHours  = document.getElementById('btn-save-business-hours');
 
   // Bootstrap modals
   const productModal = new bootstrap.Modal(productModalEl);
@@ -192,6 +215,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Hide all dynamic sections first
     fieldsCoffeeBean.classList.add('d-none');
     fieldsBrand.classList.add('d-none');
+    fieldsDripbagRecipes.classList.add('d-none');
 
     if (cat === '咖啡豆') {
       fieldsCoffeeBean.classList.remove('d-none');
@@ -202,12 +226,76 @@ document.addEventListener('DOMContentLoaded', () => {
     } else if (cat === '掛耳包組') {
       fieldsBrand.classList.remove('d-none');
       fieldPackageNotesWrap.classList.remove('d-none');
+      fieldsDripbagRecipes.classList.remove('d-none');
       if (!inputUnit1.value) inputUnit1.value = '每組';
+      renderRecipeSelects();
     } else if (cat === '周邊產品') {
       fieldsBrand.classList.remove('d-none');
       fieldPackageNotesWrap.classList.add('d-none');
       if (!inputUnit1.value) inputUnit1.value = '個';
     }
+  }
+
+  function renderRecipeSelects() {
+    const coffeeBeans = allProducts.filter(p => p.category === '咖啡豆');
+    recipeListContainer.innerHTML = '';
+    recipeDuplicateFeedback.style.display = 'none';
+
+    let optionsHtml = '<option value="">── 請選擇咖啡豆 ──</option>';
+    coffeeBeans.forEach(b => {
+      const name = [b.origin, b.estate, b.processMethod].filter(Boolean).join(' - ');
+      optionsHtml += `<option value="${b.productID}">[${b.productID}] ${name}</option>`;
+    });
+
+    for (let i = 1; i <= 5; i++) {
+      const row = document.createElement('div');
+      row.className = 'row g-2 mb-2 align-items-center recipe-row';
+      row.innerHTML = `
+        <div class="col-8">
+          <select class="form-select form-control-custom recipe-select" id="recipe-sub-id-${i}">
+            ${optionsHtml}
+          </select>
+        </div>
+        <div class="col-4">
+          <div class="input-group">
+            <input type="number" class="form-control form-control-custom recipe-qty" id="recipe-qty-${i}" value="2" min="1">
+            <span class="input-group-text bg-dark border-secondary text-secondary px-2">包</span>
+          </div>
+        </div>
+      `;
+      recipeListContainer.appendChild(row);
+    }
+
+    // Bind change event for duplicate check
+    document.querySelectorAll('.recipe-select').forEach(sel => {
+      sel.addEventListener('change', checkRecipeDuplicates);
+    });
+  }
+
+  function checkRecipeDuplicates() {
+    const selects = document.querySelectorAll('.recipe-select');
+    const selected = new Set();
+    let hasDuplicate = false;
+
+    selects.forEach(sel => sel.classList.remove('is-invalid-custom'));
+    recipeDuplicateFeedback.style.display = 'none';
+
+    selects.forEach(sel => {
+      const val = sel.value;
+      if (val) {
+        if (selected.has(val)) {
+          hasDuplicate = true;
+          sel.classList.add('is-invalid-custom');
+        } else {
+          selected.add(val);
+        }
+      }
+    });
+
+    if (hasDuplicate) {
+      recipeDuplicateFeedback.style.display = 'block';
+    }
+    return hasDuplicate;
   }
 
   function updateNamePreview() {
@@ -227,6 +315,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Reset dynamic sections
     fieldsCoffeeBean.classList.add('d-none');
     fieldsBrand.classList.add('d-none');
+    fieldsDripbagRecipes.classList.add('d-none');
     inputProductID.disabled = false;
     codeHelpText.textContent = '編號儲存後不可修改。';
     productModal.show();
@@ -267,6 +356,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     applyCategory(p.category);
     updateNamePreview();
+
+    // Fill recipes if exists
+    if (p.category === '掛耳包組' && p.recipes && p.recipes.length > 0) {
+      const selects = document.querySelectorAll('.recipe-select');
+      const qtys = document.querySelectorAll('.recipe-qty');
+      p.recipes.forEach((r, idx) => {
+        if (idx < selects.length) {
+          selects[idx].value = r.subProductID || '';
+          qtys[idx].value = r.quantity || 2;
+        }
+      });
+    }
+
     productModal.show();
   }
 
@@ -313,6 +415,26 @@ document.addEventListener('DOMContentLoaded', () => {
     if (stockVal === '' || Number(stockVal) < 0 || !Number.isInteger(Number(stockVal))) {
       showInputError(inputStock, '庫存必須為 ≥ 0 的整數。'); valid = false;
     }
+
+    // Extract & validate recipes
+    let recipes = [];
+    if (cat === '掛耳包組') {
+      if (checkRecipeDuplicates()) {
+        valid = false;
+      } else {
+        const selects = document.querySelectorAll('.recipe-select');
+        const qtys = document.querySelectorAll('.recipe-qty');
+        for (let i = 0; i < selects.length; i++) {
+          if (selects[i].value) {
+            recipes.push({
+              subProductID: selects[i].value,
+              quantity: Number(qtys[i].value) || 2
+            });
+          }
+        }
+      }
+    }
+
     if (!valid) return;
 
     setSaveLoading(true);
@@ -334,7 +456,8 @@ document.addEventListener('DOMContentLoaded', () => {
       salePrice:        salePrice ? Number(salePrice) : null,
       flavorDescription:inputFlavor.value.trim() || null,
       stock:            Number(stockVal),
-      isLimited:        inputIsLimited.checked
+      isLimited:        inputIsLimited.checked,
+      recipes:          cat === '掛耳包組' ? recipes : []
     };
 
     const url    = isEditMode ? `/api/products/${idVal}` : '/api/products';
@@ -406,10 +529,283 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     });
 
+    // Sidebar Toggles
+    menuProducts.addEventListener('click', (e) => {
+      e.preventDefault();
+      menuOrdering.classList.remove('active');
+      menuBusinessHours.classList.remove('active');
+      menuProducts.classList.add('active');
+      sectionOrdering.classList.add('d-none');
+      sectionBusinessHours.classList.add('d-none');
+      sectionProducts.classList.remove('d-none');
+      pageTitle.textContent = '商品管理';
+    });
+
+    menuOrdering.addEventListener('click', (e) => {
+      e.preventDefault();
+      menuProducts.classList.remove('active');
+      menuBusinessHours.classList.remove('active');
+      menuOrdering.classList.add('active');
+      sectionProducts.classList.add('d-none');
+      sectionBusinessHours.classList.add('d-none');
+      sectionOrdering.classList.remove('d-none');
+      pageTitle.textContent = '訂購方式管理';
+      loadOrderingGuide();
+    });
+
+    menuBusinessHours.addEventListener('click', (e) => {
+      e.preventDefault();
+      menuProducts.classList.remove('active');
+      menuOrdering.classList.remove('active');
+      menuBusinessHours.classList.add('active');
+      sectionProducts.classList.add('d-none');
+      sectionOrdering.classList.add('d-none');
+      sectionBusinessHours.classList.remove('d-none');
+      pageTitle.textContent = '營業時間管理';
+      loadBusinessHours();
+    });
+
+    // Ordering Guide Items
+    btnAddOrderingItem.addEventListener('click', () => {
+      addOrderingItemRow();
+    });
+
+    btnSaveOrdering.addEventListener('click', saveOrderingGuide);
+
+    // Business Hours
+    btnSaveBusinessHours.addEventListener('click', saveBusinessHours);
+
     // Logout
     const logout = () => { sessionStorage.removeItem('token'); sessionStorage.removeItem('user'); window.location.href = '/login.html'; };
     btnLogout.addEventListener('click', logout);
     if (btnLogoutMobile) btnLogoutMobile.addEventListener('click', logout);
+  }
+
+  // ============================================================
+  // Ordering Guide Logic
+  // ============================================================
+  async function loadOrderingGuide() {
+    try {
+      const res = await fetch('/api/admin/ordering-guide');
+      const result = await res.json();
+      if (res.ok && result.success) {
+        orderingMainDesc.value = result.data.mainDescription || '';
+        orderingItemsContainer.innerHTML = '';
+        if (result.data.items && result.data.items.length > 0) {
+          result.data.items.forEach(item => addOrderingItemRow(item.title, item.content));
+        } else {
+          addOrderingItemRow('', ''); // Add one empty row by default
+        }
+      }
+    } catch (e) {
+      showGlobalAlert('無法載入訂購方式資料。', 'danger');
+    }
+  }
+
+  function addOrderingItemRow(title = '', content = '') {
+    const row = document.createElement('div');
+    row.className = 'ordering-item-row p-3 mb-3 border border-secondary rounded position-relative';
+    row.style.backgroundColor = 'rgba(255,255,255,0.02)';
+    row.innerHTML = `
+      <div class="row g-3">
+        <div class="col-12">
+          <label class="form-label form-label-custom">步驟標題</label>
+          <input type="text" class="form-control form-control-custom item-title" value="${escapeHtml(title)}" placeholder="例如：1、請加 line 訂購">
+        </div>
+        <div class="col-12">
+          <label class="form-label form-label-custom">詳細內容</label>
+          <textarea class="form-control form-control-custom item-content" rows="3" placeholder="詳細說明內容...">${escapeHtml(content)}</textarea>
+        </div>
+      </div>
+      <button class="btn btn-sm btn-outline-danger position-absolute top-0 end-0 m-2 btn-remove-ordering-item" title="移除此項目"><i class="bi bi-trash"></i></button>
+    `;
+    
+    row.querySelector('.btn-remove-ordering-item').addEventListener('click', () => {
+      row.remove();
+    });
+
+    orderingItemsContainer.appendChild(row);
+  }
+
+  async function saveOrderingGuide() {
+    const mainDesc = orderingMainDesc.value.trim();
+    const rows = orderingItemsContainer.querySelectorAll('.ordering-item-row');
+    const items = [];
+    
+    rows.forEach((row, idx) => {
+      items.push({
+        stepNumber: idx + 1,
+        title: row.querySelector('.item-title').value.trim(),
+        content: row.querySelector('.item-content').value.trim()
+      });
+    });
+
+    try {
+      const btnOrigHtml = btnSaveOrdering.innerHTML;
+      btnSaveOrdering.disabled = true;
+      btnSaveOrdering.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>儲存中...';
+
+      const res = await fetch('/api/admin/ordering-guide', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mainDescription: mainDesc, items: items })
+      });
+      const result = await res.json();
+      
+      btnSaveOrdering.disabled = false;
+      btnSaveOrdering.innerHTML = btnOrigHtml;
+
+      if (res.ok && result.success) {
+        showGlobalAlert('訂購方式設定已成功儲存！', 'success');
+      } else {
+        showGlobalAlert(result.message || '儲存失敗', 'danger');
+      }
+    } catch (err) {
+      btnSaveOrdering.disabled = false;
+      btnSaveOrdering.innerHTML = '<i class="bi bi-save-fill me-2"></i>儲存設定';
+      showGlobalAlert('無法連線至伺服器。', 'danger');
+    }
+  }
+
+  // ============================================================
+  // Business Hours Logic
+  // ============================================================
+  const dayNames = { 1: '星期一', 2: '星期二', 3: '星期三', 4: '星期四', 5: '星期五', 6: '星期六', 7: '星期日' };
+
+  async function loadBusinessHours() {
+    try {
+      const res = await fetch('/api/admin/business-hours');
+      const result = await res.json();
+      if (res.ok && result.success) {
+        businessAnnouncement.value = result.data.announcement || '';
+        renderBusinessDays(result.data.days || []);
+      }
+    } catch (e) {
+      showGlobalAlert('無法載入營業時間資料。', 'danger');
+    }
+  }
+
+  function renderBusinessDays(daysData) {
+    businessDaysContainer.innerHTML = '';
+    for (let i = 1; i <= 7; i++) {
+      const dayData = daysData.find(d => d.dayOfWeek === i) || { dayOfWeek: i, isOpen: true, slots: [{ startTime: '11:00', endTime: '21:00' }] };
+      const row = document.createElement('div');
+      row.className = 'business-day-row p-3 mb-3 border border-secondary rounded';
+      row.style.backgroundColor = 'rgba(255,255,255,0.02)';
+      row.dataset.day = i;
+
+      const isOpenCheck = dayData.isOpen ? 'checked' : '';
+      
+      let html = `
+        <div class="row g-3 align-items-center">
+          <div class="col-md-2 col-4">
+            <div class="form-check form-switch fs-5">
+              <input class="form-check-input business-toggle" type="checkbox" id="bh-toggle-${i}" ${isOpenCheck}>
+              <label class="form-check-label text-light business-label" for="bh-toggle-${i}">${dayData.isOpen ? '營業' : '店休'}</label>
+            </div>
+            <div class="text-info fw-bold mt-1">${dayNames[i]}</div>
+          </div>
+          <div class="col-md-10 col-8">
+            <div class="slots-container d-flex flex-wrap gap-2 mb-2"></div>
+            <button class="btn btn-sm btn-outline-info btn-add-slot" ${dayData.isOpen ? '' : 'disabled'}><i class="bi bi-plus-lg me-1"></i>增加時段</button>
+          </div>
+        </div>
+      `;
+      row.innerHTML = html;
+      
+      const toggle = row.querySelector('.business-toggle');
+      const label = row.querySelector('.business-label');
+      const btnAddSlot = row.querySelector('.btn-add-slot');
+      const slotsContainer = row.querySelector('.slots-container');
+
+      const renderSlot = (startTime, endTime) => {
+        const slotEl = document.createElement('div');
+        slotEl.className = 'd-flex align-items-center gap-1 bg-dark p-2 rounded border border-secondary slot-item';
+        slotEl.innerHTML = `
+          <input type="time" class="form-control form-control-sm form-control-custom slot-start" value="${startTime}" ${dayData.isOpen ? '' : 'disabled'}>
+          <span class="text-secondary">-</span>
+          <input type="time" class="form-control form-control-sm form-control-custom slot-end" value="${endTime}" ${dayData.isOpen ? '' : 'disabled'}>
+          <button class="btn btn-sm btn-outline-danger ms-1 btn-remove-slot" ${dayData.isOpen ? '' : 'disabled'}><i class="bi bi-trash"></i></button>
+        `;
+        slotEl.querySelector('.btn-remove-slot').addEventListener('click', () => { slotEl.remove(); });
+        slotsContainer.appendChild(slotEl);
+      };
+
+      if (dayData.slots && dayData.slots.length > 0) {
+        dayData.slots.forEach(s => renderSlot(s.startTime, s.endTime));
+      } else {
+        renderSlot('11:00', '21:00'); // default fallback
+      }
+
+      btnAddSlot.addEventListener('click', () => {
+        renderSlot('11:00', '21:00');
+      });
+
+      toggle.addEventListener('change', (e) => {
+        const isOpen = e.target.checked;
+        label.textContent = isOpen ? '營業' : '店休';
+        btnAddSlot.disabled = !isOpen;
+        slotsContainer.querySelectorAll('input, button').forEach(el => el.disabled = !isOpen);
+        if (!isOpen) {
+          slotsContainer.querySelectorAll('.slot-item').forEach(el => el.style.opacity = '0.5');
+        } else {
+          slotsContainer.querySelectorAll('.slot-item').forEach(el => el.style.opacity = '1');
+        }
+      });
+      
+      // Initialize opacity
+      if (!dayData.isOpen) {
+        slotsContainer.querySelectorAll('.slot-item').forEach(el => el.style.opacity = '0.5');
+      }
+
+      businessDaysContainer.appendChild(row);
+    }
+  }
+
+  async function saveBusinessHours() {
+    const data = {
+      announcement: businessAnnouncement.value.trim(),
+      days: []
+    };
+
+    document.querySelectorAll('.business-day-row').forEach(row => {
+      const dayOfWeek = parseInt(row.dataset.day);
+      const isOpen = row.querySelector('.business-toggle').checked;
+      const slots = [];
+      row.querySelectorAll('.slot-item').forEach(slot => {
+        slots.push({
+          startTime: slot.querySelector('.slot-start').value,
+          endTime: slot.querySelector('.slot-end').value
+        });
+      });
+      data.days.push({ dayOfWeek, isOpen, slots });
+    });
+
+    try {
+      const btnOrigHtml = btnSaveBusinessHours.innerHTML;
+      btnSaveBusinessHours.disabled = true;
+      btnSaveBusinessHours.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>儲存中...';
+
+      const res = await fetch('/api/admin/business-hours', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      const result = await res.json();
+      
+      btnSaveBusinessHours.disabled = false;
+      btnSaveBusinessHours.innerHTML = btnOrigHtml;
+
+      if (res.ok && result.success) {
+        showGlobalAlert('營業時間設定已成功儲存！', 'success');
+      } else {
+        showGlobalAlert(result.message || '儲存失敗', 'danger');
+      }
+    } catch (err) {
+      btnSaveBusinessHours.disabled = false;
+      btnSaveBusinessHours.innerHTML = '<i class="bi bi-save-fill me-2"></i>儲存設定';
+      showGlobalAlert('無法連線至伺服器。', 'danger');
+    }
   }
 
   // ============================================================

@@ -72,6 +72,32 @@ function validateProductPayload(body, isEdit = false) {
     }
   }
 
+  // 掛耳包配方
+  if (category === '掛耳包組' && body.recipes) {
+    if (!Array.isArray(body.recipes)) {
+      errors.push('配方必須為陣列格式。');
+    } else {
+      const subIDs = new Set();
+      for (const r of body.recipes) {
+        if (!r.subProductID) {
+          errors.push('配方缺少咖啡豆編號。');
+          break;
+        }
+        if (subIDs.has(r.subProductID)) {
+          errors.push('配方中不可選擇重複的咖啡豆。');
+          break;
+        }
+        subIDs.add(r.subProductID);
+        
+        const q = Number(r.quantity);
+        if (isNaN(q) || !Number.isInteger(q) || q <= 0) {
+          errors.push('配方數量必須為大於 0 的整數。');
+          break;
+        }
+      }
+    }
+  }
+
   return errors;
 }
 
@@ -97,7 +123,11 @@ function buildProductObject(body, productID) {
     salePrice:         toNum(body.salePrice),
     flavorDescription: toStr(body.flavorDescription),
     stock:             body.stock !== undefined && body.stock !== '' ? Number(body.stock) : 0,
-    isLimited:         toBool(body.isLimited)
+    isLimited:         toBool(body.isLimited),
+    recipes:           Array.isArray(body.recipes) ? body.recipes.map(r => ({
+                         subProductID: toStr(r.subProductID),
+                         quantity: toNum(r.quantity)
+                       })) : []
   };
 }
 

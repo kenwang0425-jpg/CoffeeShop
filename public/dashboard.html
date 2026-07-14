@@ -22,10 +22,22 @@
         </div>
       </div>
       <ul class="sidebar-menu">
-        <li class="menu-item active">
-          <a href="#" id="menu-products">
+        <li class="menu-item active" id="menu-products">
+          <a href="#">
             <i class="bi bi-grid-1x2-fill"></i>
             <span>商品管理</span>
+          </a>
+        </li>
+        <li class="menu-item" id="menu-ordering">
+          <a href="#">
+            <i class="bi bi-journal-text"></i>
+            <span>📝 訂購方式管理</span>
+          </a>
+        </li>
+        <li class="menu-item" id="menu-business-hours">
+          <a href="#">
+            <i class="bi bi-clock-fill"></i>
+            <span>🕒 營業時間</span>
           </a>
         </li>
       </ul>
@@ -63,7 +75,9 @@
           <button type="button" class="btn-close btn-close-white-custom" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
 
-        <div class="glass-card">
+        <!-- ── 商品管理區塊 ── -->
+        <div id="section-products">
+          <div class="glass-card">
           <!-- 搜尋 & 新增 -->
           <div class="row g-3 justify-content-between align-items-center mb-4">
             <div class="col-12 col-md-4">
@@ -115,6 +129,66 @@
             <p class="text-muted">點選右上方「新增商品」按鈕來建立第一筆商品！</p>
           </div>
         </div>
+        </div> <!-- Closed section-products -->
+
+        <!-- ── 訂購方式管理區塊 ── -->
+        <div id="section-ordering" class="d-none">
+          <div class="glass-card">
+            <h5 class="text-info fw-bold mb-3"><i class="bi bi-journal-text me-2"></i>訂購方式設定</h5>
+            <div class="mb-4">
+              <label for="ordering-main-desc" class="form-label form-label-custom">主說明（前導字）</label>
+              <textarea class="form-control form-control-custom" id="ordering-main-desc" rows="6" placeholder="可直接到店訂購(桃園市中壢區庄敬路811巷12號1樓)..."></textarea>
+            </div>
+            
+            <hr class="border-secondary my-4">
+            
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <h6 class="text-warning fw-bold mb-0"><i class="bi bi-list-ol me-2"></i>動態步驟清單區</h6>
+              <button class="btn btn-sm btn-outline-info" id="btn-add-ordering-item">
+                <i class="bi bi-plus-lg me-1"></i>新增說明項目
+              </button>
+            </div>
+
+            <div id="ordering-items-container">
+              <!-- 動態項目將生成於此 -->
+            </div>
+
+            <div class="text-end mt-4">
+              <button class="btn btn-primary px-5" id="btn-save-ordering">
+                <i class="bi bi-save-fill me-2"></i>💾 儲存訂購方式
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── 營業時間管理區塊 ── -->
+        <div id="section-business-hours" class="d-none">
+          <div class="glass-card">
+            <h5 class="text-info fw-bold mb-3"><i class="bi bi-clock-fill me-2"></i>營業時間設定</h5>
+            
+            <!-- 第一區：臨時營運異動公告 -->
+            <div class="mb-4">
+              <label for="business-announcement" class="form-label form-label-custom text-warning"><i class="bi bi-megaphone-fill me-1"></i>臨時營運異動公告</label>
+              <textarea class="form-control form-control-custom" id="business-announcement" rows="3" placeholder="有臨時異動再登打即可，留空則前台不顯示任何公告"></textarea>
+            </div>
+            
+            <hr class="border-secondary my-4">
+            
+            <!-- 第二區：標準營業時間 -->
+            <h6 class="text-info fw-bold mb-3"><i class="bi bi-calendar-week me-2"></i>標準營業時間</h6>
+            
+            <div id="business-days-container">
+              <!-- JS 會在這裡產生週一到週日的區塊 -->
+            </div>
+
+            <div class="text-end mt-4">
+              <button class="btn btn-primary px-5" id="btn-save-business-hours">
+                <i class="bi bi-save-fill me-2"></i>💾 儲存營業時間
+              </button>
+            </div>
+          </div>
+        </div>
+
       </section>
     </main>
   </div>
@@ -195,6 +269,16 @@
                   <input type="text" class="form-control form-control-custom" id="product-package-notes" placeholder="如: 10包/組，內含5種各2包">
                 </div>
               </div>
+            </div>
+
+            <!-- ── 掛耳包組專用：配方組合設定 ── -->
+            <div id="fields-dripbag-recipes" class="d-none">
+              <hr class="border-secondary my-3">
+              <p class="text-info fs-8 mb-2 fw-bold text-uppercase tracking-wider"><i class="bi bi-diagram-3 me-1"></i>配方組合設定</p>
+              <div id="recipe-list-container">
+                <!-- 動態產生的 5 組選項會放在這裡 -->
+              </div>
+              <div class="invalid-feedback-custom" id="recipe-duplicate-feedback">配方中不可選擇重複的咖啡豆。</div>
             </div>
 
             <!-- ── 多規格價格 (共用) ── -->

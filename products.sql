@@ -64,3 +64,109 @@ VALUES
   ('ACC001', N'周邊產品', N'KAKAMA COFFEE', N'個', 280, 350, 280,
    N'KAKAMA COFFEE 自家品牌濾紙，專為手沖設計，配合V60使用效果最佳。', 100, 0);
 GO
+
+-- ============================================================
+-- 掛耳包配方表 (DripBagRecipes)
+-- ============================================================
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='DripBagRecipes' AND xtype='U')
+BEGIN
+  CREATE TABLE DripBagRecipes (
+    ParentProductID VARCHAR(20) NOT NULL,
+    SubProductID    VARCHAR(20) NOT NULL,
+    Quantity        INT NOT NULL DEFAULT 2,
+    PRIMARY KEY (ParentProductID, SubProductID)
+  );
+END
+GO
+
+-- 範例配方 (DP001 包含 CO135)
+INSERT INTO DripBagRecipes (ParentProductID, SubProductID, Quantity)
+VALUES ('DP001', 'CO135', 2);
+GO
+
+-- ============================================================
+-- 訂購方式管理 (Ordering Guide)
+-- ============================================================
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='OrderingGuide' AND xtype='U')
+BEGIN
+  CREATE TABLE OrderingGuide (
+    GuideID INT NOT NULL PRIMARY KEY,
+    MainDescription NVARCHAR(MAX) NULL
+  );
+END
+GO
+
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='OrderingGuideItems' AND xtype='U')
+BEGIN
+  CREATE TABLE OrderingGuideItems (
+    ItemID INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+    StepNumber INT NOT NULL,
+    Title NVARCHAR(255) NULL,
+    Content NVARCHAR(MAX) NULL
+  );
+END
+GO
+
+-- 預設測試資料 (Ordering Guide)
+IF NOT EXISTS (SELECT * FROM OrderingGuide WHERE GuideID = 1)
+BEGIN
+  INSERT INTO OrderingGuide (GuideID, MainDescription)
+  VALUES (1, N'桃子');
+
+  INSERT INTO OrderingGuideItems (StepNumber, Title, Content)
+  VALUES (1, N'請加 line 訂購', N'Line id: goodcafe');
+END
+GO
+
+-- ============================================================
+-- 營業時間管理 (Business Hours)
+-- ============================================================
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='BusinessAnnouncement' AND xtype='U')
+BEGIN
+  CREATE TABLE BusinessAnnouncement (
+    AnnouncementID INT NOT NULL PRIMARY KEY,
+    Content NVARCHAR(MAX) NULL
+  );
+END
+GO
+
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='BusinessHours' AND xtype='U')
+BEGIN
+  CREATE TABLE BusinessHours (
+    DayOfWeek INT NOT NULL PRIMARY KEY,
+    IsOpen BIT NOT NULL DEFAULT 1
+  );
+END
+GO
+
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='BusinessHourSlots' AND xtype='U')
+BEGIN
+  CREATE TABLE BusinessHourSlots (
+    SlotID INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+    DayOfWeek INT NOT NULL,
+    StartTime VARCHAR(5) NOT NULL,
+    EndTime VARCHAR(5) NOT NULL
+  );
+END
+GO
+
+-- 預設測試資料 (Business Hours)
+IF NOT EXISTS (SELECT * FROM BusinessAnnouncement WHERE AnnouncementID = 1)
+BEGIN
+  INSERT INTO BusinessAnnouncement (AnnouncementID, Content)
+  VALUES (1, N'');
+
+  -- 星期一至星期日 (1-7)
+  INSERT INTO BusinessHours (DayOfWeek, IsOpen) VALUES 
+  (1, 0), (2, 1), (3, 1), (4, 1), (5, 1), (6, 1), (7, 1);
+
+  -- 預設時段 (二到日)
+  DECLARE @day INT = 2;
+  WHILE @day <= 7
+  BEGIN
+    INSERT INTO BusinessHourSlots (DayOfWeek, StartTime, EndTime)
+    VALUES (@day, '11:00', '14:30'), (@day, '17:00', '21:00');
+    SET @day = @day + 1;
+  END
+END
+GO

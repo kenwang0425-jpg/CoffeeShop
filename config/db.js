@@ -76,7 +76,12 @@ let mockProducts = [
     salePrice: null,
     flavorDescription: '綜合烘焙，堅果醇厚、焦糖甜感，適合喜愛濃醇口感的您。',
     stock: 30,
-    isLimited: true
+    isLimited: true,
+    recipes: [
+      { subProductID: 'CO135', quantity: 2 },
+      { subProductID: 'CO246', quantity: 2 },
+      { subProductID: 'CO379', quantity: 2 }
+    ]
   },
   {
     productID: 'DP002',
@@ -91,7 +96,8 @@ let mockProducts = [
     salePrice: null,
     flavorDescription: '水果酸甜、優雅花香，適合喜愛清爽明亮口感的您。',
     stock: 20,
-    isLimited: true
+    isLimited: true,
+    recipes: []
   },
   // ─── 周邊產品 ───
   {
@@ -110,6 +116,29 @@ let mockProducts = [
     isLimited: false
   }
 ];
+
+let mockOrderingGuide = {
+  mainDescription: '可直接到店訂購(桃園市中壢區庄敬路811巷12號1樓)...',
+  items: [
+    { stepNumber: 1, title: '1.請加line訂購', content: 'Line id: goodcafe' },
+    { stepNumber: 2, title: '2.選擇寄送方式', content: '可選擇超商店到店或宅配' },
+    { stepNumber: 3, title: '3.確認訂單', content: '我們會與您確認訂單內容與金額' },
+    { stepNumber: 4, title: '4.匯款後出貨', content: '請於確認後兩日內匯款' }
+  ]
+};
+
+let mockBusinessHours = {
+  announcement: '',
+  days: [
+    { dayOfWeek: 1, isOpen: false, slots: [] },
+    { dayOfWeek: 2, isOpen: true, slots: [{ startTime: '11:00', endTime: '14:30' }, { startTime: '17:00', endTime: '21:00' }] },
+    { dayOfWeek: 3, isOpen: true, slots: [{ startTime: '11:00', endTime: '14:30' }, { startTime: '17:00', endTime: '21:00' }] },
+    { dayOfWeek: 4, isOpen: true, slots: [{ startTime: '11:00', endTime: '14:30' }, { startTime: '17:00', endTime: '21:00' }] },
+    { dayOfWeek: 5, isOpen: true, slots: [{ startTime: '11:00', endTime: '14:30' }, { startTime: '17:00', endTime: '21:00' }] },
+    { dayOfWeek: 6, isOpen: true, slots: [{ startTime: '11:00', endTime: '14:30' }, { startTime: '17:00', endTime: '21:00' }] },
+    { dayOfWeek: 7, isOpen: true, slots: [{ startTime: '11:00', endTime: '14:30' }, { startTime: '17:00', endTime: '21:00' }] }
+  ]
+};
 
 // ============================================================
 // SQL Server 連線設定
@@ -162,10 +191,78 @@ async function initializeDB() {
         FlavorDescription NVARCHAR(MAX) NULL,
         Stock            INT            NOT NULL DEFAULT 0,
         IsLimited        BIT            NOT NULL DEFAULT 0
-      )
+      );
+
+      IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='DripBagRecipes' AND xtype='U')
+      CREATE TABLE DripBagRecipes (
+        ParentProductID VARCHAR(20) NOT NULL,
+        SubProductID    VARCHAR(20) NOT NULL,
+        Quantity        INT NOT NULL DEFAULT 2,
+        PRIMARY KEY (ParentProductID, SubProductID)
+      );
+
+      IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='OrderingGuide' AND xtype='U')
+      CREATE TABLE OrderingGuide (
+        GuideID INT NOT NULL PRIMARY KEY,
+        MainDescription NVARCHAR(MAX) NULL
+      );
+
+      IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='OrderingGuideItems' AND xtype='U')
+      CREATE TABLE OrderingGuideItems (
+        ItemID INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        StepNumber INT NOT NULL,
+        Title NVARCHAR(255) NULL,
+        Content NVARCHAR(MAX) NULL
+      );
+
+      IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='BusinessAnnouncement' AND xtype='U')
+      CREATE TABLE BusinessAnnouncement (
+        AnnouncementID INT NOT NULL PRIMARY KEY,
+        Content NVARCHAR(MAX) NULL
+      );
+
+      IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='BusinessHours' AND xtype='U')
+      CREATE TABLE BusinessHours (
+        DayOfWeek INT NOT NULL PRIMARY KEY,
+        IsOpen BIT NOT NULL DEFAULT 1
+      );
+
+      IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='BusinessHourSlots' AND xtype='U')
+      CREATE TABLE BusinessHourSlots (
+        SlotID INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        DayOfWeek INT NOT NULL,
+        StartTime VARCHAR(5) NOT NULL,
+        EndTime VARCHAR(5) NOT NULL
+      );
     `;
     await pool.request().query(createTableQuery);
-    console.log('📋 [Database] Products 資料表確認完畢（新版多類別 Schema）。');
+
+    // 寫入預設測試資料 (若不存在)
+    const initDataQuery = `
+      IF NOT EXISTS (SELECT * FROM OrderingGuide WHERE GuideID = 1)
+      BEGIN
+        INSERT INTO OrderingGuide (GuideID, MainDescription)
+        VALUES (1, N'桃子');
+
+        INSERT INTO OrderingGuideItems (StepNumber, Title, Content)
+        VALUES (1, N'請加 line 訂購', N'Line id: goodcafe');
+      END
+
+      IF NOT EXISTS (SELECT * FROM BusinessAnnouncement WHERE AnnouncementID = 1)
+      BEGIN
+        INSERT INTO BusinessAnnouncement (AnnouncementID, Content) VALUES (1, N'');
+        INSERT INTO BusinessHours (DayOfWeek, IsOpen) VALUES (1, 0), (2, 1), (3, 1), (4, 1), (5, 1), (6, 1), (7, 1);
+        DECLARE @day INT = 2;
+        WHILE @day <= 7
+        BEGIN
+          INSERT INTO BusinessHourSlots (DayOfWeek, StartTime, EndTime) VALUES (@day, '11:00', '14:30'), (@day, '17:00', '21:00');
+          SET @day = @day + 1;
+        END
+      END
+    `;
+    await pool.request().query(initDataQuery);
+
+    console.log('📋 [Database] Products, DripBagRecipes, OrderingGuide & BusinessHours 資料表確認完畢。');
   } catch (err) {
     console.error('❌ [Database] SQL Server 連線失敗，自動降級使用「本地記憶體陣列」模式。錯誤原因:', err.message);
     pool = null;
@@ -194,32 +291,111 @@ function mapRecord(r) {
   };
 }
 
+// 補齊配方並自動組裝FlavorDescription
+async function populateRecipes(products) {
+  const dripBags = products.filter(p => p.category === '掛耳包組');
+  if (dripBags.length === 0) return products;
+
+  if (pool) {
+    try {
+      const parentIDs = dripBags.map(p => `'${p.productID}'`).join(',');
+      const result = await pool.request().query(`
+        SELECT r.ParentProductID, r.SubProductID, r.Quantity, p.Origin, p.Estate, p.Name, p.ProcessMethod
+        FROM DripBagRecipes r
+        JOIN Products p ON r.SubProductID = p.ProductID
+        WHERE r.ParentProductID IN (${parentIDs})
+      `);
+      
+      const recipeMap = {};
+      result.recordset.forEach(row => {
+        if (!recipeMap[row.ParentProductID]) recipeMap[row.ParentProductID] = [];
+        recipeMap[row.ParentProductID].push({
+          subProductID: row.SubProductID,
+          quantity: row.Quantity,
+          origin: row.Origin,
+          estate: row.Estate,
+          name: row.Name,
+          processMethod: row.ProcessMethod
+        });
+      });
+
+      dripBags.forEach(p => {
+        p.recipes = recipeMap[p.productID] || [];
+        if (p.recipes.length > 0) {
+          const parts = p.recipes.map(r => {
+            const beanName = [r.origin, r.estate, r.name, r.processMethod].filter(Boolean).join(' ');
+            return `${beanName}(${r.quantity}包)`;
+          });
+          p.flavorDescription = `內含 ${parts.join('、')}`;
+        }
+      });
+      return products;
+    } catch (err) {
+      console.error('SQL Server 查詢 recipes 錯誤:', err.message);
+    }
+  }
+
+  // Memory mode
+  dripBags.forEach(p => {
+    p.recipes = p.recipes || [];
+    if (p.recipes.length > 0) {
+      const parts = p.recipes.map(r => {
+        const bean = mockProducts.find(m => m.productID === r.subProductID);
+        if (bean) {
+          const beanName = [bean.origin, bean.estate, bean.name, bean.processMethod].filter(Boolean).join(' ');
+          return `${beanName}(${r.quantity}包)`;
+        }
+        return `未知咖啡豆(${r.quantity}包)`;
+      });
+      p.flavorDescription = `內含 ${parts.join('、')}`;
+    }
+  });
+
+  return products;
+}
+
 // 取得產品列表
 async function getProducts() {
+  let products = null;
   if (pool) {
     try {
       const result = await pool.request().query('SELECT * FROM Products ORDER BY Category, ProductID');
-      return result.recordset.map(mapRecord);
+      products = result.recordset.map(mapRecord);
     } catch (err) {
       console.error('SQL Server 查詢錯誤，使用記憶體陣列代替:', err.message);
     }
   }
-  return [...mockProducts];
+  if (!products) {
+    products = JSON.parse(JSON.stringify(mockProducts));
+  }
+  return await populateRecipes(products);
 }
 
 // 取得單一產品
 async function getProductByID(productID) {
+  let product = null;
   if (pool) {
     try {
       const result = await pool.request()
         .input('productID', mssql.NVarChar(20), productID)
         .query('SELECT * FROM Products WHERE ProductID = @productID');
-      return result.recordset[0] ? mapRecord(result.recordset[0]) : null;
+      if (result.recordset[0]) {
+        product = mapRecord(result.recordset[0]);
+      }
     } catch (err) {
       console.error('SQL Server 查詢錯誤，使用記憶體陣列代替:', err.message);
     }
   }
-  return mockProducts.find(p => p.productID.toLowerCase() === productID.toLowerCase()) || null;
+  if (!product) {
+    const mock = mockProducts.find(p => p.productID.toLowerCase() === productID.toLowerCase());
+    if (mock) product = JSON.parse(JSON.stringify(mock));
+  }
+
+  if (product) {
+    const populated = await populateRecipes([product]);
+    return populated[0];
+  }
+  return null;
 }
 
 // 檢查產品編號是否已存在
@@ -259,12 +435,23 @@ async function addProduct(product) {
           (@productID,@category,@origin,@estate,@name,@processMethod,@brand,@packageNotes,
            @unit_1,@price_1,@unit_2,@price_2,@unit_3,@price_3,
            @originalPrice,@salePrice,@flavorDescription,@stock,@isLimited)`);
+      
+      // 新增 Recipe
+      if (product.category === '掛耳包組' && product.recipes && product.recipes.length > 0) {
+        for (const r of product.recipes) {
+          await pool.request()
+            .input('parentID', mssql.VarChar(20), product.productID)
+            .input('subID', mssql.VarChar(20), r.subProductID)
+            .input('qty', mssql.Int, r.quantity || 2)
+            .query(`INSERT INTO DripBagRecipes (ParentProductID, SubProductID, Quantity) VALUES (@parentID, @subID, @qty)`);
+        }
+      }
       return;
     } catch (err) {
       console.error('SQL Server 新增錯誤，寫入記憶體陣列代替:', err.message);
     }
   }
-  mockProducts.push({ ...product });
+  mockProducts.push(JSON.parse(JSON.stringify(product)));
 }
 
 // 修改產品
@@ -299,7 +486,25 @@ async function updateProduct(productID, updated) {
           OriginalPrice=@originalPrice, SalePrice=@salePrice,
           FlavorDescription=@flavorDescription, Stock=@stock, IsLimited=@isLimited
           WHERE ProductID=@productID`);
-      return result.rowsAffected[0] > 0;
+      
+      // 更新 Recipe
+      if (updated.category === '掛耳包組') {
+        // 刪除舊配方
+        await pool.request()
+          .input('parentID', mssql.VarChar(20), productID)
+          .query(`DELETE FROM DripBagRecipes WHERE ParentProductID=@parentID`);
+        // 新增新配方
+        if (updated.recipes && updated.recipes.length > 0) {
+          for (const r of updated.recipes) {
+            await pool.request()
+              .input('parentID', mssql.VarChar(20), productID)
+              .input('subID', mssql.VarChar(20), r.subProductID)
+              .input('qty', mssql.Int, r.quantity || 2)
+              .query(`INSERT INTO DripBagRecipes (ParentProductID, SubProductID, Quantity) VALUES (@parentID, @subID, @qty)`);
+          }
+        }
+      }
+      return result.rowsAffected[0] > 0 || (updated.category === '掛耳包組'); // if only recipe updated
     } catch (err) {
       console.error('SQL Server 修改錯誤，修改記憶體陣列代替:', err.message);
     }
@@ -307,7 +512,7 @@ async function updateProduct(productID, updated) {
 
   const idx = mockProducts.findIndex(p => p.productID.toLowerCase() === productID.toLowerCase());
   if (idx !== -1) {
-    mockProducts[idx] = { productID, ...updated };
+    mockProducts[idx] = JSON.parse(JSON.stringify({ productID, ...updated }));
     return true;
   }
   return false;
@@ -317,6 +522,11 @@ async function updateProduct(productID, updated) {
 async function deleteProduct(productID) {
   if (pool) {
     try {
+      // 刪除關聯配方
+      await pool.request()
+        .input('productID', mssql.NVarChar(20), productID)
+        .query('DELETE FROM DripBagRecipes WHERE ParentProductID = @productID OR SubProductID = @productID');
+
       const result = await pool.request()
         .input('productID', mssql.NVarChar(20), productID)
         .query('DELETE FROM Products WHERE ProductID = @productID');
@@ -330,4 +540,163 @@ async function deleteProduct(productID) {
   return mockProducts.length < before;
 }
 
-module.exports = { initializeDB, getProducts, getProductByID, isProductIDExists, addProduct, updateProduct, deleteProduct };
+// ============================================================
+// Ordering Guide 相關操作
+// ============================================================
+
+async function getOrderingGuide() {
+  if (pool) {
+    try {
+      const guideResult = await pool.request().query('SELECT MainDescription FROM OrderingGuide WHERE GuideID = 1');
+      const itemsResult = await pool.request().query('SELECT StepNumber, Title, Content FROM OrderingGuideItems ORDER BY StepNumber ASC');
+      
+      return {
+        mainDescription: guideResult.recordset[0] ? guideResult.recordset[0].MainDescription : '',
+        items: itemsResult.recordset.map(row => ({
+          stepNumber: row.StepNumber,
+          title: row.Title,
+          content: row.Content
+        }))
+      };
+    } catch (err) {
+      console.error('SQL Server OrderingGuide 查詢錯誤，使用記憶體變數代替:', err.message);
+    }
+  }
+  return JSON.parse(JSON.stringify(mockOrderingGuide));
+}
+
+async function saveOrderingGuide(data) {
+  if (pool) {
+    const transaction = new mssql.Transaction(pool);
+    try {
+      await transaction.begin();
+      const req = transaction.request();
+      
+      // 1. 更新主說明
+      await req.input('desc', mssql.NVarChar(mssql.MAX), data.mainDescription || '')
+               .query(`
+                 IF EXISTS (SELECT * FROM OrderingGuide WHERE GuideID = 1)
+                   UPDATE OrderingGuide SET MainDescription = @desc WHERE GuideID = 1;
+                 ELSE
+                   INSERT INTO OrderingGuide (GuideID, MainDescription) VALUES (1, @desc);
+               `);
+
+      // 2. 清除舊項目並寫入新項目
+      await req.query('DELETE FROM OrderingGuideItems');
+      
+      if (data.items && Array.isArray(data.items)) {
+        for (let i = 0; i < data.items.length; i++) {
+          const item = data.items[i];
+          const insertReq = transaction.request();
+          await insertReq
+            .input('step', mssql.Int, item.stepNumber || (i + 1))
+            .input('title', mssql.NVarChar(255), item.title || '')
+            .input('content', mssql.NVarChar(mssql.MAX), item.content || '')
+            .query('INSERT INTO OrderingGuideItems (StepNumber, Title, Content) VALUES (@step, @title, @content)');
+        }
+      }
+
+      await transaction.commit();
+      return true;
+    } catch (err) {
+      await transaction.rollback();
+      console.error('SQL Server OrderingGuide 更新錯誤，更新記憶體變數代替:', err.message);
+    }
+  }
+  mockOrderingGuide = JSON.parse(JSON.stringify(data));
+  return true;
+}
+
+// ============================================================
+// Business Hours 相關操作
+// ============================================================
+
+async function getBusinessHours() {
+  if (pool) {
+    try {
+      const annResult = await pool.request().query('SELECT Content FROM BusinessAnnouncement WHERE AnnouncementID = 1');
+      const hoursResult = await pool.request().query('SELECT DayOfWeek, IsOpen FROM BusinessHours ORDER BY DayOfWeek ASC');
+      const slotsResult = await pool.request().query('SELECT DayOfWeek, StartTime, EndTime FROM BusinessHourSlots ORDER BY DayOfWeek ASC, StartTime ASC');
+      
+      const announcement = annResult.recordset[0] ? (annResult.recordset[0].Content || '') : '';
+      const days = [];
+      
+      for (let i = 1; i <= 7; i++) {
+        const hourRow = hoursResult.recordset.find(r => r.DayOfWeek === i);
+        const slotsRow = slotsResult.recordset.filter(r => r.DayOfWeek === i);
+        
+        days.push({
+          dayOfWeek: i,
+          isOpen: hourRow ? hourRow.IsOpen : false,
+          slots: slotsRow.map(s => ({ startTime: s.StartTime, endTime: s.EndTime }))
+        });
+      }
+      
+      return { announcement, days };
+    } catch (err) {
+      console.error('SQL Server BusinessHours 查詢錯誤，使用記憶體變數代替:', err.message);
+    }
+  }
+  return JSON.parse(JSON.stringify(mockBusinessHours));
+}
+
+async function saveBusinessHours(data) {
+  if (pool) {
+    const transaction = new mssql.Transaction(pool);
+    try {
+      await transaction.begin();
+      const req = transaction.request();
+      
+      // 更新公告
+      await req.input('content', mssql.NVarChar(mssql.MAX), data.announcement || '')
+               .query(`
+                 IF EXISTS (SELECT * FROM BusinessAnnouncement WHERE AnnouncementID = 1)
+                   UPDATE BusinessAnnouncement SET Content = @content WHERE AnnouncementID = 1;
+                 ELSE
+                   INSERT INTO BusinessAnnouncement (AnnouncementID, Content) VALUES (1, @content);
+               `);
+
+      // 清除舊資料
+      await req.query('DELETE FROM BusinessHours');
+      await req.query('DELETE FROM BusinessHourSlots');
+      
+      if (data.days && Array.isArray(data.days)) {
+        for (const day of data.days) {
+          const dayReq = transaction.request();
+          await dayReq
+            .input('day', mssql.Int, day.dayOfWeek)
+            .input('isOpen', mssql.Bit, day.isOpen ? 1 : 0)
+            .query('INSERT INTO BusinessHours (DayOfWeek, IsOpen) VALUES (@day, @isOpen)');
+            
+          if (day.isOpen && day.slots && Array.isArray(day.slots)) {
+            for (const slot of day.slots) {
+              if (slot.startTime && slot.endTime) {
+                const slotReq = transaction.request();
+                await slotReq
+                  .input('day', mssql.Int, day.dayOfWeek)
+                  .input('start', mssql.VarChar(5), slot.startTime)
+                  .input('end', mssql.VarChar(5), slot.endTime)
+                  .query('INSERT INTO BusinessHourSlots (DayOfWeek, StartTime, EndTime) VALUES (@day, @start, @end)');
+              }
+            }
+          }
+        }
+      }
+
+      await transaction.commit();
+      return true;
+    } catch (err) {
+      await transaction.rollback();
+      console.error('SQL Server BusinessHours 更新錯誤，更新記憶體變數代替:', err.message);
+    }
+  }
+  mockBusinessHours = JSON.parse(JSON.stringify(data));
+  return true;
+}
+
+module.exports = { 
+  initializeDB, 
+  getProducts, getProductByID, isProductIDExists, addProduct, updateProduct, deleteProduct,
+  getOrderingGuide, saveOrderingGuide,
+  getBusinessHours, saveBusinessHours
+};
