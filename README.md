@@ -53,3 +53,28 @@
 
 ---
 *本專案由 Antigravity AI 協同開發，展示了從需求理解、架構規劃到 UI/UX 與後端 API 串接的高效完整流程。*
+## 🛡️ KAKAMA 專案開發規範：Vibe Coding 三招防禦心法
+
+在享受 AI 高速編碼（Vibe Coding）的便利時，為避免 AI 因「區域上下文盲區」導致全域污染（例如：改前台卻改壞後台），所有開發者與 AI 協作時必須嚴格遵守以下三招防禦心法：
+
+### 1. 🎨 樣式徹底命名空間化 (Scoped CSS)
+* **原則**：嚴禁 AI 直接修改全域標籤（如 `body`、`h1`、`button`、`header` 等）的樣式。
+* **作法**：
+    * 前台所有樣式必須封裝在命名空間 `.client-portal`（或專屬前綴）內。
+    * 後台管理系統所有樣式必須封裝在 `.admin-portal` 內。
+    * 若有共用元件，需獨立成 `common.css` 並保持極度克制。
+
+### 2. ⚡ JS 模組化隔離與零全域污染 (No Global Pollution)
+* **原則**：前後台 JavaScript 必須徹底分流，嚴禁在 `window` 下建立衝突的全域變數或無範圍限制的 DOM 監聽器。
+* **作法**：
+    * 前台邏輯專屬 `app.js`，後台邏輯專屬 `admin.js`。
+    * 使用 **IIFE (立即執行函式)** 或 **ES Modules (import/export)** 進行封裝。
+    * 避免直接對 `document` 或通用 Class 名稱綁定全域事件，必須先鎖定父容器（例如：`document.querySelector('#admin-sidebar').addEventListener(...)`）。
+
+### 3. 📂 專案目錄與靜態資源嚴格分家 (Directory Isolation)
+* **原則**：結構上徹底隔離，老死不相往來。
+* **作法**：
+    * 前台靜態檔案置於 `public/`（如 `index.html`、`style.css`、`app.js`）。
+    * 後台管理系統置於獨立子目錄 `public/admin/`（如 `admin.html`、`admin.css`、`admin.js`）。
+    * 兩者在前端不共用任何 HTML 結構，確保路由與靜態資源載入完全獨立。
+    

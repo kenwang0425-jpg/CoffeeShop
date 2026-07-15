@@ -300,7 +300,8 @@ async function populateRecipes(products) {
     try {
       const parentIDs = dripBags.map(p => `'${p.productID}'`).join(',');
       const result = await pool.request().query(`
-        SELECT r.ParentProductID, r.SubProductID, r.Quantity, p.Origin, p.Estate, p.Name, p.ProcessMethod
+        SELECT r.ParentProductID, r.SubProductID, r.Quantity,
+               p.Origin, p.Estate, p.Name, p.ProcessMethod, p.FlavorDescription
         FROM DripBagRecipes r
         JOIN Products p ON r.SubProductID = p.ProductID
         WHERE r.ParentProductID IN (${parentIDs})
@@ -310,12 +311,13 @@ async function populateRecipes(products) {
       result.recordset.forEach(row => {
         if (!recipeMap[row.ParentProductID]) recipeMap[row.ParentProductID] = [];
         recipeMap[row.ParentProductID].push({
-          subProductID: row.SubProductID,
-          quantity: row.Quantity,
-          origin: row.Origin,
-          estate: row.Estate,
-          name: row.Name,
-          processMethod: row.ProcessMethod
+          subProductID:      row.SubProductID,
+          quantity:          row.Quantity,
+          origin:            row.Origin,
+          estate:            row.Estate,
+          name:              row.Name,
+          processMethod:     row.ProcessMethod,
+          flavorDescription: row.FlavorDescription
         });
       });
 
@@ -339,15 +341,18 @@ async function populateRecipes(products) {
   dripBags.forEach(p => {
     p.recipes = p.recipes || [];
     if (p.recipes.length > 0) {
-      const parts = p.recipes.map(r => {
+      p.recipes = p.recipes.map(r => {
         const bean = mockProducts.find(m => m.productID === r.subProductID);
-        if (bean) {
-          const beanName = [bean.origin, bean.estate, bean.name, bean.processMethod].filter(Boolean).join(' ');
-          return `${beanName}(${r.quantity}包)`;
-        }
-        return `未知咖啡豆(${r.quantity}包)`;
+        return bean ? {
+          subProductID:      r.subProductID,
+          quantity:          r.quantity,
+          origin:            bean.origin,
+          estate:            bean.estate,
+          name:              bean.name,
+          processMethod:     bean.processMethod,
+          flavorDescription: bean.flavorDescription
+        } : r;
       });
-      p.flavorDescription = `內含 ${parts.join('、')}`;
     }
   });
 
@@ -694,9 +699,66 @@ async function saveBusinessHours(data) {
   return true;
 }
 
+// ============================================================
+// Storefront 前台專用查詢
+// ============================================================
+
+// 依大類撈取商品（category: '咖啡豆' | '掛耳包組' | '周邊產品' | null 回傳全部）
+async function getProductsByCategory(category) {
+  let products = null;
+  if (pool) {
+    try {
+      let query = 'SELECT * FROM Products';
+      const request = pool.request();
+      if (category) {
+        query += ' WHERE Category = @category';
+        request.input('category', mssql.NVarChar(20), category);
+      }
+      query += ' ORDER BY Category, ProductID';
+      const result = await request.query(query);
+      products = result.recordset.map(mapRecord);
+    } catch (err) {
+      console.error('SQL Server getProductsByCategory 查詢錯誤，使用記憶體陣列代替:', err.message);
+    }
+  }
+  if (!products) {
+    products = JSON.parse(JSON.stringify(mockProducts));
+    if (category) {
+      products = products.filter(p => p.category === category);
+    }
+  }
+  return await populateRecipes(products);
+}
+
+// 動態撈取咖啡豆的 origin 與 processMethod 清單（GROUP BY）
+async function getCoffeeBeanFilters() {
+  if (pool) {
+    try {
+      const originResult = await pool.request().query(
+        `SELECT DISTINCT Origin FROM Products WHERE Category = N'咖啡豆' AND Origin IS NOT NULL ORDER BY Origin`
+      );
+      const processResult = await pool.request().query(
+        `SELECT DISTINCT ProcessMethod FROM Products WHERE Category = N'咖啡豆' AND ProcessMethod IS NOT NULL ORDER BY ProcessMethod`
+      );
+      return {
+        origins: originResult.recordset.map(r => r.Origin).filter(Boolean),
+        processMethods: processResult.recordset.map(r => r.ProcessMethod).filter(Boolean)
+      };
+    } catch (err) {
+      console.error('SQL Server getCoffeeBeanFilters 查詢錯誤，使用記憶體陣列代替:', err.message);
+    }
+  }
+  // Memory mode
+  const beans = mockProducts.filter(p => p.category === '咖啡豆');
+  const origins = [...new Set(beans.map(p => p.origin).filter(Boolean))].sort();
+  const processMethods = [...new Set(beans.map(p => p.processMethod).filter(Boolean))].sort();
+  return { origins, processMethods };
+}
+
 module.exports = { 
   initializeDB, 
   getProducts, getProductByID, isProductIDExists, addProduct, updateProduct, deleteProduct,
   getOrderingGuide, saveOrderingGuide,
-  getBusinessHours, saveBusinessHours
+  getBusinessHours, saveBusinessHours,
+  getProductsByCategory, getCoffeeBeanFilters
 };

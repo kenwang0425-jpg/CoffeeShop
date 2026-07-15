@@ -4,268 +4,268 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>精品烘焙咖啡電商網站 - 首頁</title>
-  <!-- Bootstrap 5 CSS -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
-  <!-- Bootstrap Icons -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+  <title>KAKAMA COFFEE｜精品烘焙咖啡 — 用一杯手沖，溫暖你的日常</title>
+  <meta name="description" content="KAKAMA COFFEE 精品咖啡品牌，嚴選全球知名莊園咖啡豆，提供精品咖啡豆、掛耳包組與周邊產品。專業烘焙，品質保證。">
   <!-- Google Fonts -->
-  <link
-    href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Noto+Sans+TC:wght@300;400;500;700&display=swap"
-    rel="stylesheet">
-  <!-- Custom Styles -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Noto+Sans+TC:wght@300;400;500;700&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <!-- Bootstrap Icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <!-- Custom Storefront CSS -->
   <link rel="stylesheet" href="/css/style.css">
 </head>
 
-<body>
+<body class="sf-body">
 
-  <!-- 頂部導覽列 (Navbar) -->
-  <nav
-    class="navbar navbar-expand-lg navbar-light bg-dark-transparent py-3 fixed-top border-bottom border-light-subtle">
-    <div class="container">
-      <a class="navbar-brand d-flex align-items-center logo-premium" href="#">
-        <i class="bi bi-cup-hot-fill me-2 text-warning"></i>
-        <span>KAKAMA COFFEE</span>
+  <!-- ══════════════════════════════════════════
+       頂部導覽列 (Navbar)
+  ══════════════════════════════════════════ -->
+  <nav class="sf-navbar" id="sf-navbar" role="navigation" aria-label="主導覽">
+    <div class="sf-nav-inner">
+      <!-- Logo -->
+      <a class="sf-logo" href="#hero-section" id="nav-logo">
+        <i class="bi bi-cup-hot-fill sf-logo-icon"></i>
+        <span class="sf-logo-text">KAKAMA COFFEE</span>
       </a>
-      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
-        aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-        <span class="navbar-toggler-icon"></span>
-      </button>
-      <div class="collapse navbar-collapse" id="navbarNav">
-        <ul class="navbar-nav ms-auto align-items-center gap-3">
-          <li class="nav-item">
-            <a class="nav-link active" href="#">首頁</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" href="#catalog-section">精品咖啡豆</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" href="/login.html"><i class="bi bi-shield-lock me-1"></i>後台管理</a>
-          </li>
-          <!-- 購物車按鈕 -->
-          <li class="nav-item ms-lg-2">
-            <button class="btn btn-outline-warning position-relative d-flex align-items-center gap-2 px-3"
-              id="btn-cart">
-              <i class="bi bi-cart3"></i>
-              <span>購物車</span>
-              <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none"
-                id="cart-badge">
-                0
-              </span>
-            </button>
-          </li>
-        </ul>
+
+      <!-- 導覽連結 (中間) -->
+      <ul class="sf-nav-links" id="sf-nav-links">
+        <li><a href="#catalog-section" class="sf-nav-link" id="nav-link-catalog">精品商品</a></li>
+        <li><a href="#ordering-section" class="sf-nav-link" id="nav-link-ordering">訂購方式</a></li>
+        <li><a href="#hours-section" class="sf-nav-link" id="nav-link-hours">營業時間</a></li>
+        <li><a href="/login.html" class="sf-nav-link sf-nav-admin" id="nav-link-admin">
+          <i class="bi bi-shield-lock"></i> 後台管理
+        </a></li>
+      </ul>
+
+      <!-- 右側：營業狀態 + 購物車 + 漢堡選單 -->
+      <div class="sf-nav-right">
+        <!-- 即時營業狀態燈 -->
+        <span class="sf-status-badge" id="business-status-badge">
+          <span class="sf-status-dot" id="status-dot"></span>
+          <span id="status-label">載入中...</span>
+        </span>
+
+        <!-- 購物車按鈕 -->
+        <button class="sf-cart-btn" id="btn-cart" aria-label="購物車">
+          <i class="fas fa-shopping-cart"></i>
+          <span class="sf-cart-badge d-none" id="cart-badge">0</span>
+        </button>
+
+        <!-- 漢堡選單 (手機) -->
+        <button class="sf-hamburger" id="sf-hamburger" aria-label="選單" aria-expanded="false">
+          <span></span><span></span><span></span>
+        </button>
       </div>
     </div>
   </nav>
 
-  <!-- Hero 區塊 -->
-  <header class="hero-section">
-    <div class="hero-overlay"></div>
-    <div class="container hero-content text-center">
-      <span
-        class="badge bg-warning text-dark px-3 py-2 fs-6 mb-3 rounded-pill fw-bold text-uppercase tracking-wider">Premium
-        Coffee Roasters</span>
-      <h1 class="hero-title mb-4">探索精品咖啡的極致芬芳</h1>
-      <p class="hero-subtitle mb-5 mx-auto">我們精選全球知名莊園咖啡豆，以職人精神精心烘焙，將每個產區獨特的水果香甜、堅果醇厚與悠長餘韻完美呈現。</p>
-      <a href="#catalog-section"
-        class="btn btn-warning-custom btn-lg px-5 py-3 fw-bold rounded-pill shadow-lg hover-scale">
-        <i class="bi bi-search me-2"></i>瀏覽今日精品豆
-      </a>
+  <!-- ══════════════════════════════════════════
+       A: Hero Section (首頁滿版英雄區)
+  ══════════════════════════════════════════ -->
+  <header class="sf-hero" id="hero-section">
+    <div class="sf-hero-bg"></div>
+    <div class="sf-hero-overlay"></div>
+
+    <!-- 浮動粒子裝飾 -->
+    <div class="sf-hero-particles" aria-hidden="true">
+      <span class="particle p1"></span>
+      <span class="particle p2"></span>
+      <span class="particle p3"></span>
+      <span class="particle p4"></span>
+      <span class="particle p5"></span>
     </div>
+
+    <div class="sf-hero-content">
+      <p class="sf-hero-eyebrow">Specialty Coffee Roasters</p>
+      <h1 class="sf-hero-title">KAKAMA COFFEE</h1>
+      <p class="sf-hero-subtitle">用一杯手沖，溫暖你的日常。</p>
+      <div class="sf-hero-actions">
+        <a href="#catalog-section" class="sf-btn sf-btn-primary" id="hero-cta-btn">
+          <i class="bi bi-cup-hot"></i> 探索精品咖啡
+        </a>
+        <a href="#ordering-section" class="sf-btn sf-btn-ghost" id="hero-order-btn">
+          如何訂購 <i class="bi bi-arrow-right"></i>
+        </a>
+      </div>
+    </div>
+
+    <!-- 向下滾動提示箭頭 -->
+    <a href="#announcement-section" class="sf-scroll-arrow" aria-label="向下捲動">
+      <i class="bi bi-chevron-down"></i>
+    </a>
   </header>
 
-  <!-- 本月限量掛耳包組預購區塊 -->
-  <section class="py-5 border-bottom border-light-subtle" id="preorder-section" style="background-color: #FDFBF7;">
-    <div class="container py-4">
-      <div class="text-center mb-5">
-        <h2 class="section-title" style="color: #332214 !important;">本月限量掛耳包組預購</h2>
-        <div class="title-underline mx-auto"></div>
-        <p class="text-warning mt-3 fs-5 fw-bold">每月底推出下個月的總合組，先訂先贏，賣完為止！</p>
-      </div>
-
-      <div class="row g-4 justify-content-center">
-        <!-- 中烘焙組 -->
-        <div class="col-12 col-md-6 col-lg-5 d-flex">
-          <div class="card coffee-card w-100 flex-column d-flex justify-content-between position-relative">
-            <span
-              class="badge bg-danger position-absolute top-0 start-0 m-3 px-3 py-2 fw-bold text-uppercase fs-7 shadow">限量預購</span>
-            <div class="card-body p-4 d-flex flex-column justify-content-between">
-              <div>
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                  <span class="badge bg-dark-amber text-warning px-2 py-1 fs-8 rounded">綜合掛耳</span>
-                </div>
-                <h3 class="card-title h5 text-dark fw-bold mb-3">中烘焙組 (10包/組)</h3>
-                <p class="card-text text-secondary italic-flavor mb-4">
-                  內含5種精品豆各2包，適合喜歡堅果醇厚與焦糖甜感的您。
-                </p>
-              </div>
-
-              <div class="price-spec-box mt-auto">
-                <div class="spec-header text-secondary mb-2 fs-8 text-uppercase tracking-wider">規格選擇 & 價格</div>
-                <div class="d-flex flex-column gap-2">
-                  <div class="d-flex align-items-center justify-content-between py-2 border-bottom border-light-subtle">
-                    <div class="d-flex align-items-center">
-                      <span class="fw-semibold text-secondary me-2 fs-7">每組</span>
-                      <span class="text-warning-custom fw-bold">NT$ 185</span>
-                    </div>
-                    <button class="btn btn-warning-custom btn-xs px-2.5 py-1 text-dark fw-bold btn-add-to-cart"
-                      data-id="PRE-01" data-name="中烘焙組 (10包/組)" data-size="每組" data-price="185">
-                      <i class="bi bi-cart-plus-fill me-1"></i>預購
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 中淺焙組 -->
-        <div class="col-12 col-md-6 col-lg-5 d-flex">
-          <div class="card coffee-card w-100 flex-column d-flex justify-content-between position-relative">
-            <span
-              class="badge bg-danger position-absolute top-0 start-0 m-3 px-3 py-2 fw-bold text-uppercase fs-7 shadow">限量預購</span>
-            <div class="card-body p-4 d-flex flex-column justify-content-between">
-              <div>
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                  <span class="badge bg-dark-amber text-warning px-2 py-1 fs-8 rounded">綜合掛耳</span>
-                </div>
-                <h3 class="card-title h5 text-dark fw-bold mb-3">中淺焙組 (10包/組)</h3>
-                <p class="card-text text-secondary italic-flavor mb-4">
-                  內含5種精品豆各2包，適合喜歡水果酸甜與優雅花香的您。
-                </p>
-              </div>
-
-              <div class="price-spec-box mt-auto">
-                <div class="spec-header text-secondary mb-2 fs-8 text-uppercase tracking-wider">規格選擇 & 價格</div>
-                <div class="d-flex flex-column gap-2">
-                  <div class="d-flex align-items-center justify-content-between py-2 border-bottom border-light-subtle">
-                    <div class="d-flex align-items-center">
-                      <span class="fw-semibold text-secondary me-2 fs-7">每組</span>
-                      <span class="text-warning-custom fw-bold">NT$ 195</span>
-                    </div>
-                    <button class="btn btn-warning-custom btn-xs px-2.5 py-1 text-dark fw-bold btn-add-to-cart"
-                      data-id="PRE-02" data-name="中淺焙組 (10包/組)" data-size="每組" data-price="195">
-                      <i class="bi bi-cart-plus-fill me-1"></i>預購
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+  <!-- ══════════════════════════════════════════
+       B: 臨時公告 Banner (動態顯示)
+  ══════════════════════════════════════════ -->
+  <div class="sf-announcement d-none" id="announcement-section" role="alert" aria-live="polite">
+    <div class="sf-announcement-inner">
+      <span class="sf-ann-icon">📢</span>
+      <span class="sf-ann-text" id="announcement-text"></span>
+      <button class="sf-ann-close" id="btn-close-announcement" aria-label="關閉公告">
+        <i class="bi bi-x-lg"></i>
+      </button>
     </div>
-  </section>
+  </div>
 
-  <!-- 商品目錄區塊 (Catalog Section) -->
-  <section class="py-5" id="catalog-section">
-    <div class="container py-4">
-      <div class="text-center mb-5">
-        <h2 class="section-title">嚴選精品咖啡豆</h2>
-        <div class="title-underline mx-auto"></div>
-        <p class="text-secondary mt-3 fs-5">所有品項皆為新鮮烘焙，真空保鮮包裝，確保極致風味呈現。</p>
+  <!-- ══════════════════════════════════════════
+       C: 商品展示區 (雙重篩選)
+  ══════════════════════════════════════════ -->
+  <section class="sf-section sf-catalog" id="catalog-section">
+    <div class="sf-container">
+      <!-- 區塊標題 -->
+      <div class="sf-section-head">
+        <p class="sf-section-eyebrow">Our Collection</p>
+        <h2 class="sf-section-title">嚴選精品商品</h2>
+        <div class="sf-title-line"></div>
       </div>
 
-      <!-- 篩選與搜尋列 -->
-      <div class="row g-3 justify-content-between align-items-center mb-5 glass-filter p-4 rounded-4">
-        <div class="col-12 col-md-6 col-lg-4">
-          <div class="input-group">
-            <span class="input-group-text bg-light border-secondary text-secondary"><i class="bi bi-search"></i></span>
-            <input type="text" class="form-control form-control-custom" id="search-beans" placeholder="搜尋國家、莊園或風味...">
+      <!-- 第一層：大分類 Tabs -->
+      <div class="sf-category-tabs" role="tablist" id="category-tabs">
+        <button class="sf-tab active" role="tab" data-category="咖啡豆" id="tab-beans" aria-selected="true">
+          ☕ 精品咖啡豆
+        </button>
+        <button class="sf-tab" role="tab" data-category="掛耳包組" id="tab-drip" aria-selected="false">
+          📦 限量掛耳包組
+        </button>
+        <button class="sf-tab" role="tab" data-category="周邊產品" id="tab-accessories" aria-selected="false">
+          🎁 周邊產品
+        </button>
+      </div>
+
+      <!-- 第二層：咖啡豆專屬篩選器 (動態生成) -->
+      <div class="sf-filter-panel" id="filter-panel">
+        <!-- 產區篩選 -->
+        <div class="sf-filter-row" id="origin-filter-row">
+          <span class="sf-filter-label">
+            <i class="bi bi-geo-alt"></i> 產區
+          </span>
+          <div class="sf-filter-btns" id="origin-filter-btns" role="group" aria-label="按產區篩選">
+            <button class="sf-filter-btn active" data-origin="all" id="filter-origin-all">全部</button>
           </div>
         </div>
-        <div class="col-12 col-md-auto d-flex gap-2 flex-wrap">
-          <button class="btn btn-outline-warning btn-sm active px-3 filter-btn" data-method="all">全部處理法</button>
-          <button class="btn btn-outline-warning btn-sm px-3 filter-btn" data-method="日曬">日曬</button>
-          <button class="btn btn-outline-warning btn-sm px-3 filter-btn" data-method="水洗">水洗</button>
-          <button class="btn btn-outline-warning btn-sm px-3 filter-btn" data-method="蜜處理">蜜處理/其他</button>
+        <!-- 處理法篩選 -->
+        <div class="sf-filter-row" id="process-filter-row">
+          <span class="sf-filter-label">
+            <i class="bi bi-funnel"></i> 處理法
+          </span>
+          <div class="sf-filter-btns" id="process-filter-btns" role="group" aria-label="按處理法篩選">
+            <button class="sf-filter-btn active" data-process="all" id="filter-process-all">全部</button>
+          </div>
         </div>
-      </div>
-
-      <!-- 載入狀態 -->
-      <div class="text-center py-5" id="catalog-loading">
-        <div class="spinner-border text-warning" role="status" style="width: 3rem; height: 3rem;">
-          <span class="visually-hidden">載入中...</span>
-        </div>
-        <p class="text-secondary mt-3">正在為您搜羅新鮮烘焙的精品咖啡豆...</p>
       </div>
 
       <!-- 商品網格 -->
-      <div class="row g-4 d-none" id="catalog-grid">
-        <!-- 由 JS 動態生成商品卡片 -->
+      <div class="sf-catalog-loading" id="catalog-loading">
+        <div class="sf-spinner"></div>
+        <p>正在為您搜羅精品咖啡...</p>
       </div>
 
-      <!-- 無商品狀態 -->
-      <div class="text-center py-5 d-none" id="catalog-empty">
-        <i class="bi bi-cup-hot text-secondary mb-3" style="font-size: 4rem;"></i>
-        <h4 class="text-secondary">目前沒有符合篩選條件的咖啡豆</h4>
-        <p class="text-muted">您可以嘗試調整搜尋關鍵字或選擇其他處理法。</p>
+      <div class="sf-product-grid d-none" id="product-grid">
+        <!-- 由 JS 動態生成 -->
       </div>
 
+      <div class="sf-catalog-empty d-none" id="catalog-empty">
+        <i class="bi bi-cup-hot sf-empty-icon"></i>
+        <h3>目前沒有符合條件的商品</h3>
+        <p>請嘗試調整篩選條件</p>
+      </div>
     </div>
   </section>
 
-  <!-- 側滑式購物車抽屜 (Cart Slide-over Drawer) -->
-  <div class="cart-drawer-overlay" id="cart-drawer-overlay"></div>
-  <div class="cart-drawer" id="cart-drawer">
-    <div class="cart-header d-flex justify-content-between align-items-center p-4 border-bottom border-secondary">
-      <h5 class="mb-0 fw-bold d-flex align-items-center gap-2 text-dark">
-        <i class="bi bi-cart3 text-warning"></i>您的購物清單
-      </h5>
-      <button class="btn-close" id="btn-close-cart" aria-label="Close"></button>
-    </div>
-
-    <!-- 購物車商品列表 -->
-    <div class="cart-body p-4" id="cart-items-container">
-      <!-- 由 JS 動態填入商品項目 -->
-    </div>
-
-    <!-- 購物車結算區 -->
-    <div class="cart-footer p-4 border-top border-secondary">
-      <div class="d-flex justify-content-between align-items-center mb-3">
-        <span class="text-secondary">小計</span>
-        <span class="fs-4 fw-bold text-warning-custom" id="cart-subtotal">NT$ 0</span>
+  <!-- ══════════════════════════════════════════
+       D: 訂購方式 Timeline
+  ══════════════════════════════════════════ -->
+  <section class="sf-section sf-ordering" id="ordering-section">
+    <div class="sf-container">
+      <div class="sf-section-head">
+        <p class="sf-section-eyebrow">How To Order</p>
+        <h2 class="sf-section-title">訂購方式</h2>
+        <div class="sf-title-line"></div>
       </div>
-      <button class="btn btn-warning-custom w-100 py-3 fw-bold rounded-3 mb-2" id="btn-checkout" disabled>
-        確認結帳
-      </button>
-      <button class="btn btn-outline-secondary w-100 py-2 btn-sm" id="btn-clear-cart">
-        清空購物車
-      </button>
-    </div>
-  </div>
 
-  <!-- 結帳成功 Toast 提示 -->
-  <div class="toast-container position-fixed bottom-0 end-0 p-3">
-    <div id="checkout-toast" class="toast align-items-center text-bg-success border-0" role="alert"
-      aria-live="assertive" aria-atomic="true">
-      <div class="d-flex">
-        <div class="toast-body">
-          <i class="bi bi-check-circle-fill me-2"></i> 訂單已成功送出！感謝您的訂購。
+      <div class="sf-ordering-main-desc" id="ordering-main-desc"></div>
+
+      <!-- Timeline 容器 -->
+      <div class="sf-timeline" id="ordering-timeline">
+        <!-- 由 JS 動態生成 -->
+        <div class="sf-timeline-loading">
+          <div class="sf-spinner"></div>
         </div>
-        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"
-          aria-label="Close"></button>
       </div>
     </div>
-  </div>
+  </section>
 
-  <!-- Footer -->
-  <footer class="bg-light text-secondary py-5 border-top border-secondary mt-5">
-    <div class="container text-center">
-      <div class="d-flex justify-content-center align-items-center gap-2 mb-3">
-        <i class="bi bi-cup-hot-fill text-warning fs-4"></i>
-        <span class="text-dark fw-bold fs-5">KAKAMA COFFEE 精品烘焙咖啡</span>
+  <!-- ══════════════════════════════════════════
+       E: 營業時間表
+  ══════════════════════════════════════════ -->
+  <section class="sf-section sf-hours" id="hours-section">
+    <div class="sf-container">
+      <div class="sf-section-head">
+        <p class="sf-section-eyebrow">Business Hours</p>
+        <h2 class="sf-section-title">營業時間</h2>
+        <div class="sf-title-line"></div>
       </div>
-      <p class="mb-2 text-dark">專業烘焙 ‧ 產地直送 ‧ 品質保證</p>
-      <p class="small text-muted mb-0">© 2026 KAKAMA COFFEE. All rights reserved. 版權所有，翻印必究。</p>
+
+      <div class="sf-hours-grid" id="hours-grid">
+        <!-- 由 JS 動態生成 -->
+        <div class="sf-timeline-loading">
+          <div class="sf-spinner"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════
+       Footer
+  ══════════════════════════════════════════ -->
+  <footer class="sf-footer">
+    <div class="sf-container">
+      <div class="sf-footer-brand">
+        <i class="bi bi-cup-hot-fill sf-footer-icon"></i>
+        <span class="sf-footer-name">KAKAMA COFFEE</span>
+      </div>
+      <p class="sf-footer-tagline">專業烘焙 ‧ 產地直送 ‧ 品質保證</p>
+      <p class="sf-footer-copy">© 2026 KAKAMA COFFEE. All rights reserved.</p>
     </div>
   </footer>
 
-  <!-- Bootstrap JS -->
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-  <!-- Store Frontpage Logic -->
-  <script src="/js/store.js"></script>
+  <!-- ══════════════════════════════════════════
+       購物車側滑抽屜
+  ══════════════════════════════════════════ -->
+  <div class="sf-cart-overlay" id="cart-overlay" aria-hidden="true"></div>
+  <aside class="sf-cart-drawer" id="cart-drawer" role="complementary" aria-label="購物車">
+    <div class="sf-cart-header">
+      <h2 class="sf-cart-title">
+        <i class="bi bi-bag2"></i> 購物清單
+      </h2>
+      <button class="sf-cart-close" id="btn-close-cart" aria-label="關閉購物車">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+    <div class="sf-cart-body" id="cart-items-container">
+      <!-- 由 JS 動態填入 -->
+    </div>
+    <div class="sf-cart-footer">
+      <div class="sf-cart-subtotal-row">
+        <span>小計</span>
+        <span class="sf-cart-total" id="cart-subtotal">NT$ 0</span>
+      </div>
+      <button class="sf-btn sf-btn-primary w-100" id="btn-checkout" disabled>確認結帳</button>
+      <button class="sf-btn sf-btn-ghost-dark w-100 mt-2" id="btn-clear-cart">清空購物車</button>
+    </div>
+  </aside>
+
+  <!-- Toast 通知 -->
+  <div class="sf-toast-area" id="sf-toast-area" aria-live="assertive"></div>
+
+  <!-- 前台邏輯 -->
+  <script src="/js/app.js"></script>
+
 </body>
 
 </html>
