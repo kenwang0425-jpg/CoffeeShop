@@ -1,0 +1,4 @@
+◇ injected env (8) from .env // tip: ⌘ enable debugging { debug: true }
+◇ injected env (0) from .env // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
+⚠️ [Database] SQL Server 尚未啟用，使用「本地記憶體陣列」模擬資料庫。
+Server is running on port \\.\pipe\517f60f8-6d10-4128-b916-94e263f61e20

@@ -1,3 +1,12 @@
+// 🛡️ 強制監聽所有未捕獲的致命錯誤，並列印出來
+process.on('uncaughtException', (err) => {
+  console.error('【致命錯誤-未捕獲異常】:', err);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('【致命錯誤-未處理的 Rejection】:', reason);
+});
+
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -6,6 +15,8 @@ require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// 【這裡原本有 app.listen，已被安全移至最底下，避免重複監聽 Named Pipe】
 
 // 中間件設定
 app.use(cors());
@@ -33,13 +44,20 @@ app.get('/', (req, res) => {
 
 // 啟動伺服器並初始化資料庫連線
 async function startServer() {
-  // 初始化資料庫 (若 DB_ENABLED=true 則連線 MSSQL，否則使用 Mock 陣列)
-  await db.initializeDB();
+  try {
+    console.log("=== 🗄️ 正在初始化資料庫連線... ===");
+    // 初始化資料庫 (若 DB_ENABLED=true 則連線 MSSQL，否則使用 Mock 陣列)
+    await db.initializeDB();
+    console.log("=== 🗄️ 資料庫初始化成功！ ===");
 
-  app.listen(PORT, () => {
-    console.log(`🚀 [Server] 伺服器已啟動，正在監聽連接埠: ${PORT}`);
-    console.log(`🔗 [Server] 本地網址: http://localhost:${PORT}`);
-  });
+    // 只有在這裡監聽一次！
+    app.listen(PORT, () => {
+      console.log(`🚀 [Server] 伺服器已啟動，正在監聽連接埠: ${PORT}`);
+      console.log(`🔗 [Server] 本地網址: http://localhost:${PORT}`);
+    });
+  } catch (error) {
+    console.error("❌ [Server] 啟動伺服器失敗，錯誤原因:", error);
+  }
 }
 
 startServer();

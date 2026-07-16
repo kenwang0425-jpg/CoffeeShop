@@ -78,3 +78,127 @@
     * 後台管理系統置於獨立子目錄 `public/admin/`（如 `admin.html`、`admin.css`、`admin.js`）。
     * 兩者在前端不共用任何 HTML 結構，確保路由與靜態資源載入完全獨立。
     
+
+## 🚀 專案部署規範：本機 IIS 守護執行 Node.js (實戰部署指南)
+
+透過 `iisnode` 模組，讓 Windows 內建的 IIS 直接守護並運行 Node.js 服務，無需在背景手動維持 `npm start`。
+
+### 1. 啟用 Windows 內建 IIS
+1. 按下 `Win + R` 輸入 `optionalfeatures`。
+2. 展開 `Internet Information Services` -> `全球資訊網服務` -> `應用程式開發功能`。
+3. **⚠️ 關鍵：務必勾選「CGI」功能。**
+
+### 2. 安裝核心雙寶套件
+* **IIS URL Rewrite（網址重寫模組）**：[微軟官方下載](https://www.iis.net/downloads/microsoft/url-rewrite)（用來分配路由）。
+* **iisnode-full (x64)**：[iisnode GitHub Releases](https://github.com/tjanczuk/iisnode/releases)（請選擇 `iisnode-full-v0.2.21-x64.msi` 版本安裝，相依元件最完整）。
+
+### 3. 配置專案根目錄 `web.config`
+在專案根目錄（與 `server.js` 同級）新增 `web.config`，引導 IIS 如何處理 Node.js 請求：
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+  <system.webServer>
+    <handlers>
+      <add name="iisnode" path="server.js" verb="*" modules="iisnode" />
+    </handlers>
+
+    <rewrite>
+      <rules>
+        <rule name="StaticContent">
+          <action type="None" />
+          <conditions>
+            <add input="{REQUEST_FILENAME}" matchType="IsFile" />
+          </conditions>
+          <match url=".*" />
+        </rule>
+
+        <rule name="DynamicContent">
+          <conditions>
+            <add input="{REQUEST_FILENAME}" matchType="IsFile" negate="True" />
+          </conditions>
+          <action type="Rewrite" url="server.js" />
+        </rule>
+      </rules>
+    </rewrite>
+
+    <security>
+      <requestFiltering>
+        <hiddenSegments>
+          <remove segment="bin"/>
+          <add segment="node_modules" />
+          <add segment="config" />
+        </hiddenSegments>
+      </requestFiltering>
+    </security>
+
+    <iisnode devErrorsEnabled="true" logDirectory="iisnode" />
+  </system.webServer>
+</configuration>
+
+4. 建立 IIS 網站與設定權限
+開啟 IIS 管理員（inetmgr），新增網站：
+
+網站名稱：KAKAMA
+
+實體路徑：指向你的 CoffeeShop 專案根目錄。
+
+連接埠 (Port)：8080（避免與預設的 80 衝突）。
+
+⚠️ 存取權限避坑大絕招：
+
+在 CoffeeShop 專案資料夾按右鍵「內容」->「安全性」->「編輯」。
+
+點選「新增」，輸入 IIS_IUSRS。
+
+允許該群組擁有 「讀取和執行」、「列出資料夾內容」 及 「讀取」 權限，否則 IIS 將拋出 500.19 或 401 權限不足錯誤。
+
+⚡ 部署實務避坑指南（精華備忘錄）
+💡 1. 嚴格禁止重複監聽連接埠（Named Pipe 衝突）
+在 iisnode 底下，PORT 變數會被 IIS 轉譯為一個動態分配的 Windows「命名管道（Named Pipe）」。
+切記：在整個 server.js 的生命週期中，只能呼叫一次 app.listen()！
+
+❌ 錯誤示範：在程式中途和底部的 startServer() 裡各寫了一次 app.listen(PORT)。這會導致第二次監聽時拋出連接埠已被佔用（EADDRINUSE），使 Node 靜默退出。
+
+✅ 正確示範：
+
+JavaScript
+const PORT = process.env.PORT || 3000; // 必須嚴格注意變數大小寫一致！
+
+async function startServer() {
+  try {
+    await db.initializeDB(); // 確保非同步資料庫初始化成功後...
+    
+    // 僅在此處監聽唯一一次！
+    app.listen(PORT, () => {
+      console.log(`🚀 [Server] 伺服器已啟動，監聽中: ${PORT}`);
+    });
+  } catch (error) {
+    console.error("❌ 伺服器啟動失敗:", error);
+  }
+}
+startServer();
+🔓 2. IIS 全域解鎖處理常式（Error 500.19 / 0x80070021）
+如果網站執行時彈出 <handlers> 區段在父層級被鎖定的錯誤，代表 IIS 預設不允許子網站的 web.config 覆蓋設定。
+
+解決辦法：以 「系統管理員身分」 開啟命令提示字元（CMD），執行以下指令解鎖：
+
+DOS
+%windir%\system32\inetsrv\appcmd.exe unlock config -section:system.webServer/handlers
+%windir%\system32\inetsrv\appcmd.exe unlock config -section:system.webServer/modules
+完成後，執行 iisreset 重啟服務。
+
+🤝 KAKAMA 專案 Debug 固定作業流程 (SOP)
+為了保持程式庫的乾淨與高效率，往後進行 bug 排除時，我們嚴格遵守以下流程，拒絕沒有對齊 Context 的盲目通靈：
+
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│ 1. 提供案發現場  │ ──> │ 2. 提供關聯代碼  │ ──> │ 3. 定位核心衝突  │ ──> │ 4. 最小變動修復  │
+│ (Log/Error/F12) │     │  (不看 Code 不動手)│     │  (尋找 Root Cause)│     │  (精簡重構防禦)   │
+└─────────────────┘     └─────────────────┘     └─────────────────┘     └─────────────────┘
+提供案發現場：優先提供詳細的錯誤 Stack、F12 控制台截圖，或 iisnode 資料夾下 .txt 檔案中的底層輸出。
+
+物理勘查，拒絕盲改：在動手前，必須完整對齊關聯檔案（如 server.js、db.js），先看過實體代碼再下結論。
+
+定位核心衝突：釐清作業系統、IIS 與 Node.js 異步事件之間的交互邏輯，找出 Root Cause。
+
+最小變動原則：精準修復、重構，拒絕大面積、無意義的覆寫，以維持 KAKAMA 系統的最優雅、最穩定狀態。
