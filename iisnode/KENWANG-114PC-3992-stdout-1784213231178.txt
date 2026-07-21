@@ -1,4 +1,0 @@
-◇ injected env (8) from .env // tip: ⌁ auth for agents [www.vestauth.com]
-◇ injected env (0) from .env // tip: ⌘ suppress logs { quiet: true }
-⚠️ [Database] SQL Server 尚未啟用，使用「本地記憶體陣列」模擬資料庫。
-Server is running on port \\.\pipe\b10ba566-4499-4ec0-ba43-8cf1e85cc95b
