@@ -232,7 +232,28 @@ async function initializeDB() {
     await pool.query(createTableQuery);
 
     // 寫入預設測試資料 (若不存在)
+    // 寫入預設測試資料 (若不存在)
     const initDataQuery = `
+      -- 1. 寫入預設商品 (咖啡豆、掛耳包組、周邊)
+      INSERT INTO Products (ProductID, Category, Origin, Estate, Name, ProcessMethod, Brand, PackageNotes, Unit_1, Price_1, Unit_2, Price_2, Unit_3, Price_3, OriginalPrice, SalePrice, FlavorDescription, Stock, IsLimited)
+      VALUES 
+      ('CO135', '咖啡豆', '衣索比亞', '耶加雪菲 歌迪貝 艾瑞莎', NULL, '日曬', NULL, NULL, '半磅', 380, '一磅', 700, '耳掛', 45, NULL, NULL, '藍莓、水蜜桃、茉莉花香、佛手柑與蜂蜜甜感，層次豐富明亮。', 50, FALSE),
+      ('CO246', '咖啡豆', '巴拿馬', '波奎特 翡翠莊園 藍標葛夏', NULL, '水洗', NULL, NULL, '半磅', 950, '一磅', 1800, '耳掛', 100, NULL, NULL, '經典茉莉花香、檸檬、柑橘、白葡萄、佛手柑氣息，明亮多汁的酸質。', 25, FALSE),
+      ('CO379', '咖啡豆', '哥倫比亞', '聖芭芭拉莊園 模範生', NULL, '水洗', NULL, NULL, '半磅', 320, '一磅', 600, '耳掛', 35, NULL, NULL, '榛果、焦糖甜感、可可風味、酸度圓潤低沉、餘韻悠長。', 80, FALSE),
+      ('DP001', '掛耳包組', NULL, NULL, NULL, NULL, '中烘焙', '10包/組，內含5種精品豆各2包', '每組', 185, NULL, NULL, NULL, NULL, NULL, NULL, '綜合烘焙，堅果醇厚、焦糖甜感，適合喜愛濃醇口感的您。', 30, TRUE),
+      ('DP002', '掛耳包組', NULL, NULL, NULL, NULL, '中淺焙', '10包/組，內含5種精品豆各2包', '每組', 195, NULL, NULL, NULL, NULL, NULL, NULL, '水果酸甜、優雅花香，適合喜愛清爽明亮口感的您。', 20, TRUE),
+      ('ACC001', '周邊產品', NULL, NULL, NULL, NULL, 'KAKAMA COFFEE', NULL, '個', 280, NULL, NULL, NULL, NULL, 350, 280, 'KAKAMA COFFEE 自家品牌濾紙，專為手沖設計，配合V60使用效果最佳。', 100, FALSE)
+      ON CONFLICT (ProductID) DO NOTHING;
+
+      -- 2. 寫入掛耳包配方
+      INSERT INTO DripBagRecipes (ParentProductID, SubProductID, Quantity)
+      VALUES 
+      ('DP001', 'CO135', 2),
+      ('DP001', 'CO246', 2),
+      ('DP001', 'CO379', 2)
+      ON CONFLICT (ParentProductID, SubProductID) DO NOTHING;
+
+      -- 3. 寫入訂購須知與營業時間預設資料
       INSERT INTO OrderingGuide (GuideID, MainDescription)
       VALUES (1, '桃子')
       ON CONFLICT (GuideID) DO NOTHING;

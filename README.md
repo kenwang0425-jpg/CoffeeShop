@@ -202,3 +202,67 @@ DOS
 定位核心衝突：釐清作業系統、IIS 與 Node.js 異步事件之間的交互邏輯，找出 Root Cause。
 
 最小變動原則：精準修復、重構，拒絕大面積、無意義的覆寫，以維持 KAKAMA 系統的最優雅、最穩定狀態。
+
+## 🛠️ 開發環境常遇到問題與排除 (Troubleshooting)
+
+### 1. PowerShell 拒絕執行 `npm start` 腳本
+
+#### ❌ 錯誤現象
+在 Windows PowerShell 下執行 `npm start` 時，出現以下紅字錯誤警告：
+> `npm : 因為這個系統上已停用指令碼執行，所以無法載入 C:\Program Files\nodejs\npm.ps1 檔案...`
+
+#### 💡 原因說明
+Windows 系統預設將 PowerShell 的指令碼執行策略（ExecutionPolicy）設為 `Restricted`，會將 `npm.ps1` 檔當成未知風險腳本封鎖。
+
+#### 🔧 解決方案（二選一）
+
+* **方案 A：本機權限一次性解鎖（強烈推薦 ⭐⭐⭐⭐⭐）**
+  1. 在 Windows 搜尋列輸入 **PowerShell**，對其按右鍵選擇 **「以系統管理員身分執行」**。
+  2. 輸入以下指令解鎖當前使用者的執行權限：
+     ```powershell
+     Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
+     ```
+  3. 出現提示時輸入 `Y` 並按下 Enter 即可完畢。後續即可在 VS Code 終端機自由執行 `npm` 指令。
+
+* **方案 B：切換終端機為 CMD**
+  1. 在 VS Code 終端機分頁點擊右上方 `+` 號旁邊的下拉選單 `v`。
+  2. 選擇 **`Command Prompt` (命令提示字元 / CMD)**。
+  3. 於 CMD 終端機內即可正常執行 `npm start`。
+
+### 2. Docker 服務連接埠 (Port) 衝突排解 (5432 轉 5433)
+
+#### ❌ 錯誤現象
+在 NAS (Synology Container Manager) 建立 PostgreSQL 容器或執行 Docker Compose 時，出現 Port 被佔用的錯誤，或是無法正常連線至資料庫。
+
+#### 💡 原因說明
+PostgreSQL 預設使用的外部連接埠為 `5432`。若 NAS 上已部署其他服務（例如 Immich 相片管理系統），該服務很可能已經佔用了預設的 `5432` Port，導致新的 PostgreSQL 容器無法順利綁定同一個 Port。
+
+#### 🔧 解決方案（Port Mapping 連接埠映射）
+保持容器內部的預設連接埠 `5432` 不變，僅將**對外曝露（Host 端）**的連接埠改為未被佔用的 **`5433`**。
+
+* **Docker Compose 設定檔 (`docker-compose.yml`) 修改範例：**
+  ```yaml
+  services:
+    kakama-postgres:
+      image: postgres:16.8-alpine
+      container_name: kakama-postgres
+      restart: always
+      ports:
+        - "5433:5432"  # 左側 5433 為對外實體 Port，右側 5432 為容器內部 Port
+      environment:
+        POSTGRES_USER: kakama_admin
+        POSTGRES_PASSWORD: ${DB_PASSWORD}
+        POSTGRES_DB: kakama_coffee
+      volumes:
+        - /volume1/docker/kakama-postgres-data:/var/lib/postgresql/data
+
+應用程式連線設定 (.env) 修改：
+在 Node.js 或 GUI 管理工具（如 DBeaver）連線時，需將 Port 指定為對外開放的 5433：
+DB_HOST=192.168.0.202
+DB_PORT=5433
+DB_USER=kakama_admin
+DB_DATABASE=kakama_coffee
+---
+
+這段放進去之後，你筆記裡的「網路架構與除錯紀錄」就完全補齊了！以後如果又要在 NAS 上開新的資料庫容器，翻一下這段筆記就能一秒想起來 Port 映射的邏輯囉！👌☕
+
