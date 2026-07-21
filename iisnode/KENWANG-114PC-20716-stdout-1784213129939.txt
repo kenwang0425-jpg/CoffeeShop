@@ -1,4 +1,0 @@
-◇ injected env (8) from .env // tip: ◈ encrypted .env [www.dotenvx.com]
-◇ injected env (0) from .env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
-⚠️ [Database] SQL Server 尚未啟用，使用「本地記憶體陣列」模擬資料庫。
-Server is running on port \\.\pipe\44678def-21bb-4cb0-8523-e90eba4cdc3d

@@ -1,0 +1,7 @@
+◇ injected env (8) from .env // tip: ◈ encrypted .env [www.dotenvx.com]
+◇ injected env (0) from .env // tip: ◈ encrypted .env [www.dotenvx.com]
+=== 🗄️ 正在初始化資料庫連線... ===
+⚠️ [Database] SQL Server 尚未啟用，使用「本地記憶體陣列」模擬資料庫。
+=== 🗄️ 資料庫初始化成功！ ===
+🚀 [Server] 伺服器已啟動，正在監聽連接埠: \\.\pipe\ac35cdfb-8cf2-44e6-a166-fa7a9e0622ac
+🔗 [Server] 本地網址: http://localhost:\\.\pipe\ac35cdfb-8cf2-44e6-a166-fa7a9e0622ac

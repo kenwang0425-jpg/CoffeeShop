@@ -1,10 +1,19 @@
-const mssql = require('mssql');
+const { Pool } = require('pg');
 require('dotenv').config();
 
-const dbEnabled = process.env.DB_ENABLED === 'true';
+// 動態檢查開關與讀取連線設定
+const isDbEnabled = () => process.env.DB_ENABLED === 'true';
+
+const getPgConfig = () => ({
+  user: process.env.DB_USER || 'kakama_admin',
+  password: process.env.DB_PASSWORD || 'Ac*927gf',
+  host: process.env.DB_HOST || '192.168.0.202',
+  database: process.env.DB_DATABASE || 'kakama_coffee',
+  port: parseInt(process.env.DB_PORT || '5433'),
+});
 
 // ============================================================
-// 記憶體模擬資料庫 - 支援三大商品類別
+// 記憶體模擬資料庫 - 支援三大商品類別 (Fallback 備援用)
 // ============================================================
 let mockProducts = [
   // ─── 咖啡豆 ───
@@ -140,158 +149,146 @@ let mockBusinessHours = {
   ]
 };
 
-// ============================================================
-// SQL Server 連線設定
-// ============================================================
-const sqlConfig = {
-  user: process.env.DB_USER || 'sa',
-  password: process.env.DB_PASSWORD || 'YourStrongPassword123',
-  server: process.env.DB_SERVER || 'localhost',
-  database: process.env.DB_DATABASE || 'ProductDB',
-  port: parseInt(process.env.DB_PORT || '1433'),
-  options: {
-    encrypt: process.env.DB_ENCRYPT === 'true',
-    trustServerCertificate: process.env.DB_TRUST_SERVER_CERTIFICATE === 'true'
-  }
-};
-
 let pool = null;
 
 // 初始化資料庫
 async function initializeDB() {
-  if (!dbEnabled) {
-    console.log('⚠️ [Database] SQL Server 尚未啟用，使用「本地記憶體陣列」模擬資料庫。');
+  if (!isDbEnabled()) {
+    console.log('⚠️ [Database] PostgreSQL 尚未啟用，使用「本地記憶體陣列」模擬資料庫。');
     return;
   }
 
-  try {
-    console.log(`🔌 [Database] 嘗試連接至 SQL Server (${sqlConfig.server}:${sqlConfig.port})...`);
-    pool = await mssql.connect(sqlConfig);
-    console.log('✅ [Database] SQL Server 連線成功！');
+  const pgConfig = getPgConfig();
 
+  try {
+    console.log(`🔌 [Database] 嘗試連接至 PostgreSQL (${pgConfig.host}:${pgConfig.port})...`);
+    pool = new Pool(pgConfig);
+
+    // 測試連線
+    const client = await pool.connect();
+    console.log('✅ [Database] PostgreSQL 連線成功！');
+    client.release();
+
+    // 建立資料表 (PostgreSQL 語法)
     const createTableQuery = `
-      IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='Products' AND xtype='U')
-      CREATE TABLE Products (
-        ProductID        NVARCHAR(20)   NOT NULL PRIMARY KEY,
-        Category         NVARCHAR(20)   NOT NULL,
-        Origin           NVARCHAR(100)  NULL,
-        Estate           NVARCHAR(255)  NULL,
-        Name             NVARCHAR(255)  NULL,
-        ProcessMethod    NVARCHAR(100)  NULL,
-        Brand            NVARCHAR(255)  NULL,
-        PackageNotes     NVARCHAR(500)  NULL,
-        Unit_1           NVARCHAR(50)   NULL,
-        Price_1          DECIMAL(10,0)  NULL,
-        Unit_2           NVARCHAR(50)   NULL,
-        Price_2          DECIMAL(10,0)  NULL,
-        Unit_3           NVARCHAR(50)   NULL,
-        Price_3          DECIMAL(10,0)  NULL,
-        OriginalPrice    DECIMAL(10,0)  NULL,
-        SalePrice        DECIMAL(10,0)  NULL,
-        FlavorDescription NVARCHAR(MAX) NULL,
-        Stock            INT            NOT NULL DEFAULT 0,
-        IsLimited        BIT            NOT NULL DEFAULT 0
+      CREATE TABLE IF NOT EXISTS Products (
+        ProductID         VARCHAR(20)   NOT NULL PRIMARY KEY,
+        Category          VARCHAR(20)   NOT NULL,
+        Origin            VARCHAR(100)  NULL,
+        Estate            VARCHAR(255)  NULL,
+        Name              VARCHAR(255)  NULL,
+        ProcessMethod     VARCHAR(100)  NULL,
+        Brand             VARCHAR(255)  NULL,
+        PackageNotes      VARCHAR(500)  NULL,
+        Unit_1            VARCHAR(50)   NULL,
+        Price_1           NUMERIC(10,0) NULL,
+        Unit_2            VARCHAR(50)   NULL,
+        Price_2           NUMERIC(10,0) NULL,
+        Unit_3            VARCHAR(50)   NULL,
+        Price_3           NUMERIC(10,0) NULL,
+        OriginalPrice     NUMERIC(10,0) NULL,
+        SalePrice         NUMERIC(10,0) NULL,
+        FlavorDescription TEXT          NULL,
+        Stock             INT           NOT NULL DEFAULT 0,
+        IsLimited         BOOLEAN       NOT NULL DEFAULT FALSE
       );
 
-      IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='DripBagRecipes' AND xtype='U')
-      CREATE TABLE DripBagRecipes (
+      CREATE TABLE IF NOT EXISTS DripBagRecipes (
         ParentProductID VARCHAR(20) NOT NULL,
         SubProductID    VARCHAR(20) NOT NULL,
         Quantity        INT NOT NULL DEFAULT 2,
         PRIMARY KEY (ParentProductID, SubProductID)
       );
 
-      IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='OrderingGuide' AND xtype='U')
-      CREATE TABLE OrderingGuide (
+      CREATE TABLE IF NOT EXISTS OrderingGuide (
         GuideID INT NOT NULL PRIMARY KEY,
-        MainDescription NVARCHAR(MAX) NULL
+        MainDescription TEXT NULL
       );
 
-      IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='OrderingGuideItems' AND xtype='U')
-      CREATE TABLE OrderingGuideItems (
-        ItemID INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+      CREATE TABLE IF NOT EXISTS OrderingGuideItems (
+        ItemID SERIAL PRIMARY KEY,
         StepNumber INT NOT NULL,
-        Title NVARCHAR(255) NULL,
-        Content NVARCHAR(MAX) NULL
+        Title VARCHAR(255) NULL,
+        Content TEXT NULL
       );
 
-      IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='BusinessAnnouncement' AND xtype='U')
-      CREATE TABLE BusinessAnnouncement (
+      CREATE TABLE IF NOT EXISTS BusinessAnnouncement (
         AnnouncementID INT NOT NULL PRIMARY KEY,
-        Content NVARCHAR(MAX) NULL
+        Content TEXT NULL
       );
 
-      IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='BusinessHours' AND xtype='U')
-      CREATE TABLE BusinessHours (
+      CREATE TABLE IF NOT EXISTS BusinessHours (
         DayOfWeek INT NOT NULL PRIMARY KEY,
-        IsOpen BIT NOT NULL DEFAULT 1
+        IsOpen BOOLEAN NOT NULL DEFAULT TRUE
       );
 
-      IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='BusinessHourSlots' AND xtype='U')
-      CREATE TABLE BusinessHourSlots (
-        SlotID INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+      CREATE TABLE IF NOT EXISTS BusinessHourSlots (
+        SlotID SERIAL PRIMARY KEY,
         DayOfWeek INT NOT NULL,
         StartTime VARCHAR(5) NOT NULL,
         EndTime VARCHAR(5) NOT NULL
       );
     `;
-    await pool.request().query(createTableQuery);
+    await pool.query(createTableQuery);
 
     // 寫入預設測試資料 (若不存在)
     const initDataQuery = `
-      IF NOT EXISTS (SELECT * FROM OrderingGuide WHERE GuideID = 1)
-      BEGIN
-        INSERT INTO OrderingGuide (GuideID, MainDescription)
-        VALUES (1, N'桃子');
+      INSERT INTO OrderingGuide (GuideID, MainDescription)
+      VALUES (1, '桃子')
+      ON CONFLICT (GuideID) DO NOTHING;
 
-        INSERT INTO OrderingGuideItems (StepNumber, Title, Content)
-        VALUES (1, N'請加 line 訂購', N'Line id: goodcafe');
-      END
+      INSERT INTO OrderingGuideItems (StepNumber, Title, Content)
+      SELECT 1, '請加 line 訂購', 'Line id: goodcafe'
+      WHERE NOT EXISTS (SELECT 1 FROM OrderingGuideItems WHERE StepNumber = 1);
 
-      IF NOT EXISTS (SELECT * FROM BusinessAnnouncement WHERE AnnouncementID = 1)
-      BEGIN
-        INSERT INTO BusinessAnnouncement (AnnouncementID, Content) VALUES (1, N'');
-        INSERT INTO BusinessHours (DayOfWeek, IsOpen) VALUES (1, 0), (2, 1), (3, 1), (4, 1), (5, 1), (6, 1), (7, 1);
-        DECLARE @day INT = 2;
-        WHILE @day <= 7
-        BEGIN
-          INSERT INTO BusinessHourSlots (DayOfWeek, StartTime, EndTime) VALUES (@day, '11:00', '14:30'), (@day, '17:00', '21:00');
-          SET @day = @day + 1;
-        END
-      END
+      INSERT INTO BusinessAnnouncement (AnnouncementID, Content)
+      VALUES (1, '')
+      ON CONFLICT (AnnouncementID) DO NOTHING;
+
+      INSERT INTO BusinessHours (DayOfWeek, IsOpen)
+      VALUES (1, FALSE), (2, TRUE), (3, TRUE), (4, TRUE), (5, TRUE), (6, TRUE), (7, TRUE)
+      ON CONFLICT (DayOfWeek) DO NOTHING;
+
+      INSERT INTO BusinessHourSlots (DayOfWeek, StartTime, EndTime)
+      SELECT d, '11:00', '14:30' FROM generate_series(2, 7) AS d
+      WHERE NOT EXISTS (SELECT 1 FROM BusinessHourSlots WHERE StartTime = '11:00' AND EndTime = '14:30');
+
+      INSERT INTO BusinessHourSlots (DayOfWeek, StartTime, EndTime)
+      SELECT d, '17:00', '21:00' FROM generate_series(2, 7) AS d
+      WHERE NOT EXISTS (SELECT 1 FROM BusinessHourSlots WHERE StartTime = '17:00' AND EndTime = '21:00');
     `;
-    await pool.request().query(initDataQuery);
+    await pool.query(initDataQuery);
 
     console.log('📋 [Database] Products, DripBagRecipes, OrderingGuide & BusinessHours 資料表確認完畢。');
   } catch (err) {
-    console.error('❌ [Database] SQL Server 連線失敗，自動降級使用「本地記憶體陣列」模式。錯誤原因:', err.message);
+    console.error('❌ [Database] PostgreSQL 連線失敗，自動降級使用「本地記憶體陣列」模式。錯誤原因:', err.message);
     pool = null;
   }
 }
 
-// ─── helper: 將 SQL recordset 欄位名轉換為 camelCase ───
+// ─── helper: 將 Postgres recordset 欄位名轉為 camelCase ───
 function mapRecord(r) {
   return {
-    productID:         r.ProductID,
-    category:          r.Category,
-    origin:            r.Origin,
-    estate:            r.Estate,
-    name:              r.Name,
-    processMethod:     r.ProcessMethod,
-    brand:             r.Brand,
-    packageNotes:      r.PackageNotes,
-    unit_1:            r.Unit_1,  price_1: r.Price_1 !== null ? Number(r.Price_1) : null,
-    unit_2:            r.Unit_2,  price_2: r.Price_2 !== null ? Number(r.Price_2) : null,
-    unit_3:            r.Unit_3,  price_3: r.Price_3 !== null ? Number(r.Price_3) : null,
-    originalPrice:     r.OriginalPrice !== null ? Number(r.OriginalPrice) : null,
-    salePrice:         r.SalePrice !== null ? Number(r.SalePrice) : null,
-    flavorDescription: r.FlavorDescription,
-    stock:             r.Stock,
-    isLimited:         !!r.IsLimited
+    productID: r.productid || r.ProductID,
+    category: r.category || r.Category,
+    origin: r.origin || r.Origin,
+    estate: r.estate || r.Estate,
+    name: r.name || r.Name,
+    processMethod: r.processmethod || r.ProcessMethod,
+    brand: r.brand || r.Brand,
+    packageNotes: r.packagenotes || r.PackageNotes,
+    unit_1: r.unit_1 || r.Unit_1, price_1: (r.price_1 ?? r.Price_1) !== null ? Number(r.price_1 ?? r.Price_1) : null,
+    unit_2: r.unit_2 || r.Unit_2, price_2: (r.price_2 ?? r.Price_2) !== null ? Number(r.price_2 ?? r.Price_2) : null,
+    unit_3: r.unit_3 || r.Unit_3, price_3: (r.price_3 ?? r.Price_3) !== null ? Number(r.price_3 ?? r.Price_3) : null,
+    originalPrice: (r.originalprice ?? r.OriginalPrice) !== null ? Number(r.originalprice ?? r.OriginalPrice) : null,
+    salePrice: (r.saleprice ?? r.SalePrice) !== null ? Number(r.saleprice ?? r.SalePrice) : null,
+    flavorDescription: r.flavordescription || r.FlavorDescription,
+    stock: r.stock ?? r.Stock,
+    isLimited: Boolean(r.islimited ?? r.IsLimited)
   };
 }
 
-// 補齊配方並自動組裝FlavorDescription
+// 補齊配方並自動組裝 FlavorDescription
 async function populateRecipes(products) {
   const dripBags = products.filter(p => p.category === '掛耳包組');
   if (dripBags.length === 0) return products;
@@ -299,25 +296,26 @@ async function populateRecipes(products) {
   if (pool) {
     try {
       const parentIDs = dripBags.map(p => `'${p.productID}'`).join(',');
-      const result = await pool.request().query(`
+      const result = await pool.query(`
         SELECT r.ParentProductID, r.SubProductID, r.Quantity,
                p.Origin, p.Estate, p.Name, p.ProcessMethod, p.FlavorDescription
         FROM DripBagRecipes r
         JOIN Products p ON r.SubProductID = p.ProductID
         WHERE r.ParentProductID IN (${parentIDs})
       `);
-      
+
       const recipeMap = {};
-      result.recordset.forEach(row => {
-        if (!recipeMap[row.ParentProductID]) recipeMap[row.ParentProductID] = [];
-        recipeMap[row.ParentProductID].push({
-          subProductID:      row.SubProductID,
-          quantity:          row.Quantity,
-          origin:            row.Origin,
-          estate:            row.Estate,
-          name:              row.Name,
-          processMethod:     row.ProcessMethod,
-          flavorDescription: row.FlavorDescription
+      result.rows.forEach(row => {
+        const parentID = row.parentproductid || row.ParentProductID;
+        if (!recipeMap[parentID]) recipeMap[parentID] = [];
+        recipeMap[parentID].push({
+          subProductID: row.subproductid || row.SubProductID,
+          quantity: row.quantity || row.Quantity,
+          origin: row.origin || row.Origin,
+          estate: row.estate || row.Estate,
+          name: row.name || row.Name,
+          processMethod: row.processmethod || row.ProcessMethod,
+          flavorDescription: row.flavordescription || row.FlavorDescription
         });
       });
 
@@ -333,7 +331,7 @@ async function populateRecipes(products) {
       });
       return products;
     } catch (err) {
-      console.error('SQL Server 查詢 recipes 錯誤:', err.message);
+      console.error('PostgreSQL 查詢 recipes 錯誤:', err.message);
     }
   }
 
@@ -344,12 +342,12 @@ async function populateRecipes(products) {
       p.recipes = p.recipes.map(r => {
         const bean = mockProducts.find(m => m.productID === r.subProductID);
         return bean ? {
-          subProductID:      r.subProductID,
-          quantity:          r.quantity,
-          origin:            bean.origin,
-          estate:            bean.estate,
-          name:              bean.name,
-          processMethod:     bean.processMethod,
+          subProductID: r.subProductID,
+          quantity: r.quantity,
+          origin: bean.origin,
+          estate: bean.estate,
+          name: bean.name,
+          processMethod: bean.processMethod,
           flavorDescription: bean.flavorDescription
         } : r;
       });
@@ -364,10 +362,10 @@ async function getProducts() {
   let products = null;
   if (pool) {
     try {
-      const result = await pool.request().query('SELECT * FROM Products ORDER BY Category, ProductID');
-      products = result.recordset.map(mapRecord);
+      const result = await pool.query('SELECT * FROM Products ORDER BY Category, ProductID');
+      products = result.rows.map(mapRecord);
     } catch (err) {
-      console.error('SQL Server 查詢錯誤，使用記憶體陣列代替:', err.message);
+      console.error('PostgreSQL 查詢錯誤，使用記憶體陣列代替:', err.message);
     }
   }
   if (!products) {
@@ -381,14 +379,12 @@ async function getProductByID(productID) {
   let product = null;
   if (pool) {
     try {
-      const result = await pool.request()
-        .input('productID', mssql.NVarChar(20), productID)
-        .query('SELECT * FROM Products WHERE ProductID = @productID');
-      if (result.recordset[0]) {
-        product = mapRecord(result.recordset[0]);
+      const result = await pool.query('SELECT * FROM Products WHERE ProductID = $1', [productID]);
+      if (result.rows[0]) {
+        product = mapRecord(result.rows[0]);
       }
     } catch (err) {
-      console.error('SQL Server 查詢錯誤，使用記憶體陣列代替:', err.message);
+      console.error('PostgreSQL 查詢錯誤，使用記憶體陣列代替:', err.message);
     }
   }
   if (!product) {
@@ -412,48 +408,48 @@ async function isProductIDExists(productID) {
 async function addProduct(product) {
   if (pool) {
     try {
-      await pool.request()
-        .input('productID',        mssql.NVarChar(20),         product.productID)
-        .input('category',         mssql.NVarChar(20),         product.category)
-        .input('origin',           mssql.NVarChar(100),        product.origin || null)
-        .input('estate',           mssql.NVarChar(255),        product.estate || null)
-        .input('name',             mssql.NVarChar(255),        product.name || null)
-        .input('processMethod',    mssql.NVarChar(100),        product.processMethod || null)
-        .input('brand',            mssql.NVarChar(255),        product.brand || null)
-        .input('packageNotes',     mssql.NVarChar(500),        product.packageNotes || null)
-        .input('unit_1',           mssql.NVarChar(50),         product.unit_1 || null)
-        .input('price_1',          mssql.Decimal(10, 0),       product.price_1 || null)
-        .input('unit_2',           mssql.NVarChar(50),         product.unit_2 || null)
-        .input('price_2',          mssql.Decimal(10, 0),       product.price_2 || null)
-        .input('unit_3',           mssql.NVarChar(50),         product.unit_3 || null)
-        .input('price_3',          mssql.Decimal(10, 0),       product.price_3 || null)
-        .input('originalPrice',    mssql.Decimal(10, 0),       product.originalPrice || null)
-        .input('salePrice',        mssql.Decimal(10, 0),       product.salePrice || null)
-        .input('flavorDescription',mssql.NVarChar(mssql.MAX),  product.flavorDescription || null)
-        .input('stock',            mssql.Int,                  product.stock ?? 0)
-        .input('isLimited',        mssql.Bit,                  product.isLimited ? 1 : 0)
-        .query(`INSERT INTO Products
-          (ProductID,Category,Origin,Estate,Name,ProcessMethod,Brand,PackageNotes,
-           Unit_1,Price_1,Unit_2,Price_2,Unit_3,Price_3,
-           OriginalPrice,SalePrice,FlavorDescription,Stock,IsLimited)
-          VALUES
-          (@productID,@category,@origin,@estate,@name,@processMethod,@brand,@packageNotes,
-           @unit_1,@price_1,@unit_2,@price_2,@unit_3,@price_3,
-           @originalPrice,@salePrice,@flavorDescription,@stock,@isLimited)`);
-      
+      const query = `
+        INSERT INTO Products
+        (ProductID, Category, Origin, Estate, Name, ProcessMethod, Brand, PackageNotes,
+         Unit_1, Price_1, Unit_2, Price_2, Unit_3, Price_3,
+         OriginalPrice, SalePrice, FlavorDescription, Stock, IsLimited)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+      `;
+      const values = [
+        product.productID,
+        product.category,
+        product.origin || null,
+        product.estate || null,
+        product.name || null,
+        product.processMethod || null,
+        product.brand || null,
+        product.packageNotes || null,
+        product.unit_1 || null,
+        product.price_1 || null,
+        product.unit_2 || null,
+        product.price_2 || null,
+        product.unit_3 || null,
+        product.price_3 || null,
+        product.originalPrice || null,
+        product.salePrice || null,
+        product.flavorDescription || null,
+        product.stock ?? 0,
+        Boolean(product.isLimited)
+      ];
+      await pool.query(query, values);
+
       // 新增 Recipe
       if (product.category === '掛耳包組' && product.recipes && product.recipes.length > 0) {
         for (const r of product.recipes) {
-          await pool.request()
-            .input('parentID', mssql.VarChar(20), product.productID)
-            .input('subID', mssql.VarChar(20), r.subProductID)
-            .input('qty', mssql.Int, r.quantity || 2)
-            .query(`INSERT INTO DripBagRecipes (ParentProductID, SubProductID, Quantity) VALUES (@parentID, @subID, @qty)`);
+          await pool.query(
+            `INSERT INTO DripBagRecipes (ParentProductID, SubProductID, Quantity) VALUES ($1, $2, $3)`,
+            [product.productID, r.subProductID, r.quantity || 2]
+          );
         }
       }
       return;
     } catch (err) {
-      console.error('SQL Server 新增錯誤，寫入記憶體陣列代替:', err.message);
+      console.error('PostgreSQL 新增錯誤，寫入記憶體陣列代替:', err.message);
     }
   }
   mockProducts.push(JSON.parse(JSON.stringify(product)));
@@ -463,55 +459,54 @@ async function addProduct(product) {
 async function updateProduct(productID, updated) {
   if (pool) {
     try {
-      const result = await pool.request()
-        .input('productID',        mssql.NVarChar(20),         productID)
-        .input('category',         mssql.NVarChar(20),         updated.category)
-        .input('origin',           mssql.NVarChar(100),        updated.origin || null)
-        .input('estate',           mssql.NVarChar(255),        updated.estate || null)
-        .input('name',             mssql.NVarChar(255),        updated.name || null)
-        .input('processMethod',    mssql.NVarChar(100),        updated.processMethod || null)
-        .input('brand',            mssql.NVarChar(255),        updated.brand || null)
-        .input('packageNotes',     mssql.NVarChar(500),        updated.packageNotes || null)
-        .input('unit_1',           mssql.NVarChar(50),         updated.unit_1 || null)
-        .input('price_1',          mssql.Decimal(10, 0),       updated.price_1 || null)
-        .input('unit_2',           mssql.NVarChar(50),         updated.unit_2 || null)
-        .input('price_2',          mssql.Decimal(10, 0),       updated.price_2 || null)
-        .input('unit_3',           mssql.NVarChar(50),         updated.unit_3 || null)
-        .input('price_3',          mssql.Decimal(10, 0),       updated.price_3 || null)
-        .input('originalPrice',    mssql.Decimal(10, 0),       updated.originalPrice || null)
-        .input('salePrice',        mssql.Decimal(10, 0),       updated.salePrice || null)
-        .input('flavorDescription',mssql.NVarChar(mssql.MAX),  updated.flavorDescription || null)
-        .input('stock',            mssql.Int,                  updated.stock ?? 0)
-        .input('isLimited',        mssql.Bit,                  updated.isLimited ? 1 : 0)
-        .query(`UPDATE Products SET
-          Category=@category, Origin=@origin, Estate=@estate, Name=@name,
-          ProcessMethod=@processMethod, Brand=@brand, PackageNotes=@packageNotes,
-          Unit_1=@unit_1, Price_1=@price_1, Unit_2=@unit_2, Price_2=@price_2,
-          Unit_3=@unit_3, Price_3=@price_3,
-          OriginalPrice=@originalPrice, SalePrice=@salePrice,
-          FlavorDescription=@flavorDescription, Stock=@stock, IsLimited=@isLimited
-          WHERE ProductID=@productID`);
-      
+      const query = `
+        UPDATE Products SET
+          Category=$1, Origin=$2, Estate=$3, Name=$4,
+          ProcessMethod=$5, Brand=$6, PackageNotes=$7,
+          Unit_1=$8, Price_1=$9, Unit_2=$10, Price_2=$11,
+          Unit_3=$12, Price_3=$13,
+          OriginalPrice=$14, SalePrice=$15,
+          FlavorDescription=$16, Stock=$17, IsLimited=$18
+        WHERE ProductID=$19
+      `;
+      const values = [
+        updated.category,
+        updated.origin || null,
+        updated.estate || null,
+        updated.name || null,
+        updated.processMethod || null,
+        updated.brand || null,
+        updated.packageNotes || null,
+        updated.unit_1 || null,
+        updated.price_1 || null,
+        updated.unit_2 || null,
+        updated.price_2 || null,
+        updated.unit_3 || null,
+        updated.price_3 || null,
+        updated.originalPrice || null,
+        updated.salePrice || null,
+        updated.flavorDescription || null,
+        updated.stock ?? 0,
+        Boolean(updated.isLimited),
+        productID
+      ];
+      const result = await pool.query(query, values);
+
       // 更新 Recipe
       if (updated.category === '掛耳包組') {
-        // 刪除舊配方
-        await pool.request()
-          .input('parentID', mssql.VarChar(20), productID)
-          .query(`DELETE FROM DripBagRecipes WHERE ParentProductID=@parentID`);
-        // 新增新配方
+        await pool.query(`DELETE FROM DripBagRecipes WHERE ParentProductID=$1`, [productID]);
         if (updated.recipes && updated.recipes.length > 0) {
           for (const r of updated.recipes) {
-            await pool.request()
-              .input('parentID', mssql.VarChar(20), productID)
-              .input('subID', mssql.VarChar(20), r.subProductID)
-              .input('qty', mssql.Int, r.quantity || 2)
-              .query(`INSERT INTO DripBagRecipes (ParentProductID, SubProductID, Quantity) VALUES (@parentID, @subID, @qty)`);
+            await pool.query(
+              `INSERT INTO DripBagRecipes (ParentProductID, SubProductID, Quantity) VALUES ($1, $2, $3)`,
+              [productID, r.subProductID, r.quantity || 2]
+            );
           }
         }
       }
-      return result.rowsAffected[0] > 0 || (updated.category === '掛耳包組'); // if only recipe updated
+      return result.rowCount > 0 || (updated.category === '掛耳包組');
     } catch (err) {
-      console.error('SQL Server 修改錯誤，修改記憶體陣列代替:', err.message);
+      console.error('PostgreSQL 修改錯誤，修改記憶體陣列代替:', err.message);
     }
   }
 
@@ -527,17 +522,11 @@ async function updateProduct(productID, updated) {
 async function deleteProduct(productID) {
   if (pool) {
     try {
-      // 刪除關聯配方
-      await pool.request()
-        .input('productID', mssql.NVarChar(20), productID)
-        .query('DELETE FROM DripBagRecipes WHERE ParentProductID = @productID OR SubProductID = @productID');
-
-      const result = await pool.request()
-        .input('productID', mssql.NVarChar(20), productID)
-        .query('DELETE FROM Products WHERE ProductID = @productID');
-      return result.rowsAffected[0] > 0;
+      await pool.query('DELETE FROM DripBagRecipes WHERE ParentProductID = $1 OR SubProductID = $1', [productID]);
+      const result = await pool.query('DELETE FROM Products WHERE ProductID = $1', [productID]);
+      return result.rowCount > 0;
     } catch (err) {
-      console.error('SQL Server 刪除錯誤，自記憶體陣列刪除代替:', err.message);
+      console.error('PostgreSQL 刪除錯誤，自記憶體陣列刪除代替:', err.message);
     }
   }
   const before = mockProducts.length;
@@ -552,19 +541,19 @@ async function deleteProduct(productID) {
 async function getOrderingGuide() {
   if (pool) {
     try {
-      const guideResult = await pool.request().query('SELECT MainDescription FROM OrderingGuide WHERE GuideID = 1');
-      const itemsResult = await pool.request().query('SELECT StepNumber, Title, Content FROM OrderingGuideItems ORDER BY StepNumber ASC');
-      
+      const guideResult = await pool.query('SELECT MainDescription FROM OrderingGuide WHERE GuideID = 1');
+      const itemsResult = await pool.query('SELECT StepNumber, Title, Content FROM OrderingGuideItems ORDER BY StepNumber ASC');
+
       return {
-        mainDescription: guideResult.recordset[0] ? guideResult.recordset[0].MainDescription : '',
-        items: itemsResult.recordset.map(row => ({
-          stepNumber: row.StepNumber,
-          title: row.Title,
-          content: row.Content
+        mainDescription: guideResult.rows[0] ? (guideResult.rows[0].maindescription || guideResult.rows[0].MainDescription) : '',
+        items: itemsResult.rows.map(row => ({
+          stepNumber: row.stepnumber || row.StepNumber,
+          title: row.title || row.Title,
+          content: row.content || row.Content
         }))
       };
     } catch (err) {
-      console.error('SQL Server OrderingGuide 查詢錯誤，使用記憶體變數代替:', err.message);
+      console.error('PostgreSQL OrderingGuide 查詢錯誤，使用記憶體變數代替:', err.message);
     }
   }
   return JSON.parse(JSON.stringify(mockOrderingGuide));
@@ -572,40 +561,38 @@ async function getOrderingGuide() {
 
 async function saveOrderingGuide(data) {
   if (pool) {
-    const transaction = new mssql.Transaction(pool);
+    const client = await pool.connect();
     try {
-      await transaction.begin();
-      const req = transaction.request();
-      
+      await client.query('BEGIN');
+
       // 1. 更新主說明
-      await req.input('desc', mssql.NVarChar(mssql.MAX), data.mainDescription || '')
-               .query(`
-                 IF EXISTS (SELECT * FROM OrderingGuide WHERE GuideID = 1)
-                   UPDATE OrderingGuide SET MainDescription = @desc WHERE GuideID = 1;
-                 ELSE
-                   INSERT INTO OrderingGuide (GuideID, MainDescription) VALUES (1, @desc);
-               `);
+      await client.query(
+        `INSERT INTO OrderingGuide (GuideID, MainDescription)
+         VALUES (1, $1)
+         ON CONFLICT (GuideID) DO UPDATE SET MainDescription = EXCLUDED.MainDescription`,
+        [data.mainDescription || '']
+      );
 
       // 2. 清除舊項目並寫入新項目
-      await req.query('DELETE FROM OrderingGuideItems');
-      
+      await client.query('DELETE FROM OrderingGuideItems');
+
       if (data.items && Array.isArray(data.items)) {
         for (let i = 0; i < data.items.length; i++) {
           const item = data.items[i];
-          const insertReq = transaction.request();
-          await insertReq
-            .input('step', mssql.Int, item.stepNumber || (i + 1))
-            .input('title', mssql.NVarChar(255), item.title || '')
-            .input('content', mssql.NVarChar(mssql.MAX), item.content || '')
-            .query('INSERT INTO OrderingGuideItems (StepNumber, Title, Content) VALUES (@step, @title, @content)');
+          await client.query(
+            'INSERT INTO OrderingGuideItems (StepNumber, Title, Content) VALUES ($1, $2, $3)',
+            [item.stepNumber || (i + 1), item.title || '', item.content || '']
+          );
         }
       }
 
-      await transaction.commit();
+      await client.query('COMMIT');
+      client.release();
       return true;
     } catch (err) {
-      await transaction.rollback();
-      console.error('SQL Server OrderingGuide 更新錯誤，更新記憶體變數代替:', err.message);
+      await client.query('ROLLBACK');
+      client.release();
+      console.error('PostgreSQL OrderingGuide 更新錯誤，更新記憶體變數代替:', err.message);
     }
   }
   mockOrderingGuide = JSON.parse(JSON.stringify(data));
@@ -619,27 +606,27 @@ async function saveOrderingGuide(data) {
 async function getBusinessHours() {
   if (pool) {
     try {
-      const annResult = await pool.request().query('SELECT Content FROM BusinessAnnouncement WHERE AnnouncementID = 1');
-      const hoursResult = await pool.request().query('SELECT DayOfWeek, IsOpen FROM BusinessHours ORDER BY DayOfWeek ASC');
-      const slotsResult = await pool.request().query('SELECT DayOfWeek, StartTime, EndTime FROM BusinessHourSlots ORDER BY DayOfWeek ASC, StartTime ASC');
-      
-      const announcement = annResult.recordset[0] ? (annResult.recordset[0].Content || '') : '';
+      const annResult = await pool.query('SELECT Content FROM BusinessAnnouncement WHERE AnnouncementID = 1');
+      const hoursResult = await pool.query('SELECT DayOfWeek, IsOpen FROM BusinessHours ORDER BY DayOfWeek ASC');
+      const slotsResult = await pool.query('SELECT DayOfWeek, StartTime, EndTime FROM BusinessHourSlots ORDER BY DayOfWeek ASC, StartTime ASC');
+
+      const announcement = annResult.rows[0] ? (annResult.rows[0].content || annResult.rows[0].Content || '') : '';
       const days = [];
-      
+
       for (let i = 1; i <= 7; i++) {
-        const hourRow = hoursResult.recordset.find(r => r.DayOfWeek === i);
-        const slotsRow = slotsResult.recordset.filter(r => r.DayOfWeek === i);
-        
+        const hourRow = hoursResult.rows.find(r => (r.dayofweek || r.DayOfWeek) === i);
+        const slotsRow = slotsResult.rows.filter(r => (r.dayofweek || r.DayOfWeek) === i);
+
         days.push({
           dayOfWeek: i,
-          isOpen: hourRow ? hourRow.IsOpen : false,
-          slots: slotsRow.map(s => ({ startTime: s.StartTime, endTime: s.EndTime }))
+          isOpen: hourRow ? Boolean(hourRow.isopen ?? hourRow.IsOpen) : false,
+          slots: slotsRow.map(s => ({ startTime: s.starttime || s.StartTime, endTime: s.endtime || s.EndTime }))
         });
       }
-      
+
       return { announcement, days };
     } catch (err) {
-      console.error('SQL Server BusinessHours 查詢錯誤，使用記憶體變數代替:', err.message);
+      console.error('PostgreSQL BusinessHours 查詢錯誤，使用記憶體變數代替:', err.message);
     }
   }
   return JSON.parse(JSON.stringify(mockBusinessHours));
@@ -647,52 +634,49 @@ async function getBusinessHours() {
 
 async function saveBusinessHours(data) {
   if (pool) {
-    const transaction = new mssql.Transaction(pool);
+    const client = await pool.connect();
     try {
-      await transaction.begin();
-      const req = transaction.request();
-      
+      await client.query('BEGIN');
+
       // 更新公告
-      await req.input('content', mssql.NVarChar(mssql.MAX), data.announcement || '')
-               .query(`
-                 IF EXISTS (SELECT * FROM BusinessAnnouncement WHERE AnnouncementID = 1)
-                   UPDATE BusinessAnnouncement SET Content = @content WHERE AnnouncementID = 1;
-                 ELSE
-                   INSERT INTO BusinessAnnouncement (AnnouncementID, Content) VALUES (1, @content);
-               `);
+      await client.query(
+        `INSERT INTO BusinessAnnouncement (AnnouncementID, Content)
+         VALUES (1, $1)
+         ON CONFLICT (AnnouncementID) DO UPDATE SET Content = EXCLUDED.Content`,
+        [data.announcement || '']
+      );
 
       // 清除舊資料
-      await req.query('DELETE FROM BusinessHours');
-      await req.query('DELETE FROM BusinessHourSlots');
-      
+      await client.query('DELETE FROM BusinessHours');
+      await client.query('DELETE FROM BusinessHourSlots');
+
       if (data.days && Array.isArray(data.days)) {
         for (const day of data.days) {
-          const dayReq = transaction.request();
-          await dayReq
-            .input('day', mssql.Int, day.dayOfWeek)
-            .input('isOpen', mssql.Bit, day.isOpen ? 1 : 0)
-            .query('INSERT INTO BusinessHours (DayOfWeek, IsOpen) VALUES (@day, @isOpen)');
-            
+          await client.query(
+            'INSERT INTO BusinessHours (DayOfWeek, IsOpen) VALUES ($1, $2)',
+            [day.dayOfWeek, Boolean(day.isOpen)]
+          );
+
           if (day.isOpen && day.slots && Array.isArray(day.slots)) {
             for (const slot of day.slots) {
               if (slot.startTime && slot.endTime) {
-                const slotReq = transaction.request();
-                await slotReq
-                  .input('day', mssql.Int, day.dayOfWeek)
-                  .input('start', mssql.VarChar(5), slot.startTime)
-                  .input('end', mssql.VarChar(5), slot.endTime)
-                  .query('INSERT INTO BusinessHourSlots (DayOfWeek, StartTime, EndTime) VALUES (@day, @start, @end)');
+                await client.query(
+                  'INSERT INTO BusinessHourSlots (DayOfWeek, StartTime, EndTime) VALUES ($1, $2, $3)',
+                  [day.dayOfWeek, slot.startTime, slot.endTime]
+                );
               }
             }
           }
         }
       }
 
-      await transaction.commit();
+      await client.query('COMMIT');
+      client.release();
       return true;
     } catch (err) {
-      await transaction.rollback();
-      console.error('SQL Server BusinessHours 更新錯誤，更新記憶體變數代替:', err.message);
+      await client.query('ROLLBACK');
+      client.release();
+      console.error('PostgreSQL BusinessHours 更新錯誤，更新記憶體變數代替:', err.message);
     }
   }
   mockBusinessHours = JSON.parse(JSON.stringify(data));
@@ -703,22 +687,21 @@ async function saveBusinessHours(data) {
 // Storefront 前台專用查詢
 // ============================================================
 
-// 依大類撈取商品（category: '咖啡豆' | '掛耳包組' | '周邊產品' | null 回傳全部）
 async function getProductsByCategory(category) {
   let products = null;
   if (pool) {
     try {
       let query = 'SELECT * FROM Products';
-      const request = pool.request();
+      const params = [];
       if (category) {
-        query += ' WHERE Category = @category';
-        request.input('category', mssql.NVarChar(20), category);
+        query += ' WHERE Category = $1';
+        params.push(category);
       }
       query += ' ORDER BY Category, ProductID';
-      const result = await request.query(query);
-      products = result.recordset.map(mapRecord);
+      const result = await pool.query(query, params);
+      products = result.rows.map(mapRecord);
     } catch (err) {
-      console.error('SQL Server getProductsByCategory 查詢錯誤，使用記憶體陣列代替:', err.message);
+      console.error('PostgreSQL getProductsByCategory 查詢錯誤，使用記憶體陣列代替:', err.message);
     }
   }
   if (!products) {
@@ -730,24 +713,24 @@ async function getProductsByCategory(category) {
   return await populateRecipes(products);
 }
 
-// 動態撈取咖啡豆的 origin 與 processMethod 清單（GROUP BY）
 async function getCoffeeBeanFilters() {
   if (pool) {
     try {
-      const originResult = await pool.request().query(
-        `SELECT DISTINCT Origin FROM Products WHERE Category = N'咖啡豆' AND Origin IS NOT NULL ORDER BY Origin`
+      const originResult = await pool.query(
+        `SELECT DISTINCT Origin FROM Products WHERE Category = '咖啡豆' AND Origin IS NOT NULL ORDER BY Origin`
       );
-      const processResult = await pool.request().query(
-        `SELECT DISTINCT ProcessMethod FROM Products WHERE Category = N'咖啡豆' AND ProcessMethod IS NOT NULL ORDER BY ProcessMethod`
+      const processResult = await pool.query(
+        `SELECT DISTINCT ProcessMethod FROM Products WHERE Category = '咖啡豆' AND ProcessMethod IS NOT NULL ORDER BY ProcessMethod`
       );
       return {
-        origins: originResult.recordset.map(r => r.Origin).filter(Boolean),
-        processMethods: processResult.recordset.map(r => r.ProcessMethod).filter(Boolean)
+        origins: originResult.rows.map(r => r.origin || r.Origin).filter(Boolean),
+        processMethods: processResult.rows.map(r => r.processmethod || r.ProcessMethod).filter(Boolean)
       };
     } catch (err) {
-      console.error('SQL Server getCoffeeBeanFilters 查詢錯誤，使用記憶體陣列代替:', err.message);
+      console.error('PostgreSQL getCoffeeBeanFilters 查詢錯誤，使用記憶體陣列代替:', err.message);
     }
   }
+
   // Memory mode
   const beans = mockProducts.filter(p => p.category === '咖啡豆');
   const origins = [...new Set(beans.map(p => p.origin).filter(Boolean))].sort();
@@ -755,8 +738,8 @@ async function getCoffeeBeanFilters() {
   return { origins, processMethods };
 }
 
-module.exports = { 
-  initializeDB, 
+module.exports = {
+  initializeDB,
   getProducts, getProductByID, isProductIDExists, addProduct, updateProduct, deleteProduct,
   getOrderingGuide, saveOrderingGuide,
   getBusinessHours, saveBusinessHours,

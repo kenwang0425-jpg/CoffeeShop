@@ -1,0 +1,7 @@
+◇ injected env (8) from .env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+◇ injected env (0) from .env // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
+=== 🗄️ 正在初始化資料庫連線... ===
+⚠️ [Database] SQL Server 尚未啟用，使用「本地記憶體陣列」模擬資料庫。
+=== 🗄️ 資料庫初始化成功！ ===
+🚀 [Server] 伺服器已啟動，正在監聽連接埠: \\.\pipe\f543c854-753f-45fc-9864-50e9d26ff01c
+🔗 [Server] 本地網址: http://localhost:\\.\pipe\f543c854-753f-45fc-9864-50e9d26ff01c
