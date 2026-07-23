@@ -1,4 +1,0 @@
-◇ injected env (8) from .env // tip: ⌘ suppress logs { quiet: true }
-◇ injected env (0) from .env // tip: ◈ encrypted .env [www.dotenvx.com]
-⚠️ [Database] SQL Server 尚未啟用，使用「本地記憶體陣列」模擬資料庫。
-Server is running on port \\.\pipe\a62e053f-7db8-4174-8c57-426236b23721

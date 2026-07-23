@@ -759,10 +759,112 @@ async function getCoffeeBeanFilters() {
   return { origins, processMethods };
 }
 
+// ============================================================
+// Customers 顧客相關操作
+// ============================================================
+
+/**
+ * 依電話號碼查詢顧客資料
+ * @param {string} phone
+ * @returns {{ phone, name, address } | null}
+ */
+async function getCustomerByPhone(phone) {
+  if (!pool) {
+    throw new Error('資料庫未啟用，無法查詢顧客資料。');
+  }
+  try {
+    const result = await pool.query(
+      'SELECT phone, name, address FROM customers WHERE phone = $1',
+      [phone]
+    );
+    if (result.rows.length === 0) return null;
+    const r = result.rows[0];
+    return { phone: r.phone, name: r.name, address: r.address };
+  } catch (err) {
+    console.error('PostgreSQL getCustomerByPhone 查詢錯誤:', err.message);
+    throw err;
+  }
+}
+
+// ============================================================
+// Orders 訂單相關操作
+// ============================================================
+
+/**
+ * 建立新訂單（含 Transaction、顧客 UPSERT、主表與明細批次寫入）
+ * @param {{ phone, name, address, items, note, totalAmount }} orderData
+ * @returns {string} 訂單編號 orderId
+ */
+async function createOrder(orderData) {
+  if (!pool) {
+    throw new Error('資料庫未啟用，無法建立訂單。');
+  }
+
+  const { phone, name, address, items, note, totalAmount } = orderData;
+
+  // 產生唯一訂單編號：ORD + timestamp + 4位隨機數
+  const orderId = `ORD${Date.now()}${Math.floor(Math.random() * 9000 + 1000)}`;
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // 1. 顧客 UPSERT：有則更新姓名與地址，無則新增
+    await client.query(
+      `INSERT INTO customers (phone, name, address, updated_at)
+       VALUES ($1, $2, $3, NOW())
+       ON CONFLICT (phone) DO UPDATE
+         SET name       = EXCLUDED.name,
+             address    = EXCLUDED.address,
+             updated_at = EXCLUDED.updated_at`,
+      [phone, name, address]
+    );
+
+    // 2. 寫入訂單主表
+    await client.query(
+      `INSERT INTO orders
+         (id, customer_phone, customer_name, shipping_address, total_amount, note, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [orderId, phone, name, address, totalAmount, note || null, 'pending']
+    );
+
+    // 3. 批次寫入訂單明細
+    if (Array.isArray(items) && items.length > 0) {
+      for (const item of items) {
+        const subtotal = Number(item.price) * Number(item.quantity);
+        await client.query(
+          `INSERT INTO order_items
+             (order_id, product_id, product_name, price, quantity, options, subtotal)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [
+            orderId,
+            item.productId,
+            item.name,
+            Number(item.price),
+            Number(item.quantity),
+            item.options ? JSON.stringify(item.options) : null,
+            subtotal
+          ]
+        );
+      }
+    }
+
+    await client.query('COMMIT');
+    return orderId;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('PostgreSQL createOrder 交易失敗，已 ROLLBACK:', err.message);
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 module.exports = {
   initializeDB,
   getProducts, getProductByID, isProductIDExists, addProduct, updateProduct, deleteProduct,
   getOrderingGuide, saveOrderingGuide,
   getBusinessHours, saveBusinessHours,
-  getProductsByCategory, getCoffeeBeanFilters
+  getProductsByCategory, getCoffeeBeanFilters,
+  getCustomerByPhone, createOrder
 };

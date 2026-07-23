@@ -55,6 +55,12 @@
           <span class="sf-cart-badge d-none" id="cart-badge">0</span>
         </button>
 
+        <!-- 查詢訂單按鈕 -->
+        <button class="sf-order-lookup-btn" id="btn-order-lookup" aria-label="查詢訂單">
+          <i class="bi bi-clock-history"></i>
+          <span class="sf-order-lookup-label">查詢訂單</span>
+        </button>
+
         <!-- 漢堡選單 (手機) -->
         <button class="sf-hamburger" id="sf-hamburger" aria-label="選單" aria-expanded="false">
           <span></span><span></span><span></span>
@@ -262,6 +268,185 @@
 
   <!-- Toast 通知 -->
   <div class="sf-toast-area" id="sf-toast-area" aria-live="assertive"></div>
+
+  <!-- ══════════════════════════════════════════
+       結帳 Modal — 訂購人資訊
+  ══════════════════════════════════════════ -->
+  <div class="co-modal-backdrop" id="checkout-modal-backdrop" aria-hidden="true"></div>
+  <div class="co-modal" id="checkout-modal" role="dialog" aria-modal="true" aria-labelledby="checkout-modal-title">
+    <div class="co-modal-inner">
+
+      <!-- Modal Header -->
+      <div class="co-modal-header">
+        <div class="co-modal-title-wrap">
+          <i class="bi bi-bag-heart-fill co-modal-icon"></i>
+          <h2 class="co-modal-title" id="checkout-modal-title">填寫訂購資訊</h2>
+        </div>
+        <button class="co-modal-close" id="btn-close-checkout-modal" aria-label="關閉">
+          <i class="bi bi-x-lg"></i>
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="co-modal-body">
+
+        <!-- 訂購人資訊表單 -->
+        <section class="co-form-section">
+          <h3 class="co-section-label"><i class="bi bi-person-fill"></i> 訂購人資訊</h3>
+
+          <div class="co-form-group">
+            <label for="co-phone" class="co-label">
+              手機號碼 <span class="co-required">*</span>
+            </label>
+            <div class="co-input-wrap">
+              <i class="bi bi-phone co-input-icon"></i>
+              <input type="tel" id="co-phone" class="co-input" placeholder="09xxxxxxxx"
+                     maxlength="10" autocomplete="tel" required>
+              <span class="co-lookup-spinner" id="co-lookup-spinner" aria-hidden="true"></span>
+            </div>
+            <p class="co-hint" id="co-phone-hint">輸入完成後將自動帶入歷史資料</p>
+          </div>
+
+          <div class="co-form-row">
+            <div class="co-form-group">
+              <label for="co-name" class="co-label">
+                姓名 <span class="co-required">*</span>
+              </label>
+              <div class="co-input-wrap">
+                <i class="bi bi-person co-input-icon"></i>
+                <input type="text" id="co-name" class="co-input" placeholder="收件人姓名" required>
+              </div>
+            </div>
+          </div>
+
+          <div class="co-form-group">
+            <label for="co-address" class="co-label">
+              郵寄地址 <span class="co-required">*</span>
+            </label>
+            <div class="co-input-wrap">
+              <i class="bi bi-geo-alt co-input-icon"></i>
+              <input type="text" id="co-address" class="co-input" placeholder="縣市、鄉鎮、路段、門號" required>
+            </div>
+          </div>
+
+          <div class="co-form-group">
+            <label for="co-note" class="co-label">訂購備註</label>
+            <div class="co-input-wrap co-textarea-wrap">
+              <i class="bi bi-chat-left-text co-input-icon co-textarea-icon"></i>
+              <textarea id="co-note" class="co-input co-textarea" rows="2"
+                        placeholder="特殊需求、配送注意事項..."></textarea>
+            </div>
+          </div>
+        </section>
+
+        <!-- 訂單商品預覽 -->
+        <section class="co-order-preview">
+          <h3 class="co-section-label"><i class="bi bi-receipt"></i> 訂單明細</h3>
+          <div class="co-order-items" id="co-order-items">
+            <!-- 由 JS 動態填入 -->
+          </div>
+          <div class="co-order-total-row">
+            <span class="co-order-total-label">訂單總金額</span>
+            <span class="co-order-total-value" id="co-order-total">NT$ 0</span>
+          </div>
+        </section>
+
+      </div><!-- /co-modal-body -->
+
+      <!-- Modal Footer -->
+      <div class="co-modal-footer">
+        <button class="co-btn co-btn-ghost" id="btn-cancel-checkout">
+          <i class="bi bi-arrow-left"></i> 返回修改
+        </button>
+        <button class="co-btn co-btn-primary" id="btn-submit-order">
+          <span class="co-btn-text"><i class="bi bi-check-circle-fill"></i> 確認送出訂單</span>
+          <span class="co-btn-loading d-none">
+            <span class="co-dot-spinner"></span> 處理中...
+          </span>
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════
+       訂單成功 Modal
+  ════════════════════════════════════════════ -->
+  <div class="co-modal-backdrop" id="success-modal-backdrop" aria-hidden="true"></div>
+  <div class="co-modal" id="success-modal" role="dialog" aria-modal="true" aria-labelledby="success-modal-title">
+    <div class="co-modal-inner sm-inner">
+      <!-- 成功動畫區 -->
+      <div class="sm-hero">
+        <span class="sm-check-ring"><i class="bi bi-check-lg"></i></span>
+        <h2 class="sm-title" id="success-modal-title">訂單已成功建立！</h2>
+        <p class="sm-subtitle">感謝您的訂購，以下是您的訂單信息</p>
+      </div>
+      <!-- 訂單資訊區 -->
+      <div class="sm-info-box">
+        <div class="sm-info-row">
+          <span class="sm-info-label">訂單編號</span>
+          <span class="sm-info-value sm-order-id" id="sm-order-id">—</span>
+        </div>
+        <div class="sm-info-row">
+          <span class="sm-info-label">訂購人</span>
+          <span class="sm-info-value" id="sm-customer-name">—</span>
+        </div>
+      </div>
+      <!-- LINE 按鈕 -->
+      <a href="https://line.me/ti/p/~goodcafe" target="_blank" rel="noopener"
+         class="sm-line-btn" id="sm-line-btn">
+        <svg viewBox="0 0 24 24" class="sm-line-icon" aria-hidden="true">
+          <path fill="currentColor" d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63h2.386c.346 0 .627.285.627.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63.346 0 .628.285.628.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .344-.281.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314"/>
+        </svg>
+        點我開啟 LINE 與店長確認訂單
+      </a>
+      <p class="sm-copy-hint" id="sm-copy-hint"></p>
+      <button class="co-btn co-btn-ghost sm-close-btn" id="btn-close-success-modal">
+        關閉此視窗
+      </button>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════
+       歷史訂單查詢 Modal
+  ════════════════════════════════════════════ -->
+  <div class="co-modal-backdrop" id="lookup-modal-backdrop" aria-hidden="true"></div>
+  <div class="co-modal" id="lookup-modal" role="dialog" aria-modal="true" aria-labelledby="lookup-modal-title">
+    <div class="co-modal-inner lm-inner">
+
+      <!-- Header -->
+      <div class="co-modal-header">
+        <div class="co-modal-title-wrap">
+          <i class="bi bi-clock-history co-modal-icon"></i>
+          <h2 class="co-modal-title" id="lookup-modal-title">歷史訂單查詢</h2>
+        </div>
+        <button class="co-modal-close" id="btn-close-lookup-modal" aria-label="關閉">
+          <i class="bi bi-x-lg"></i>
+        </button>
+      </div>
+
+      <!-- Search Bar -->
+      <div class="lm-search-bar">
+        <div class="co-input-wrap" style="flex:1">
+          <i class="bi bi-phone co-input-icon"></i>
+          <input type="tel" id="lm-phone" class="co-input" placeholder="請輸入手機號碼" maxlength="10">
+        </div>
+        <button class="co-btn co-btn-primary lm-search-btn" id="btn-lookup-orders">
+          <span class="lm-btn-text"><i class="bi bi-search"></i> 查詢</span>
+          <span class="co-btn-loading d-none"><span class="co-dot-spinner"></span></span>
+        </button>
+      </div>
+
+      <!-- Results -->
+      <div class="lm-results" id="lm-results">
+        <div class="lm-placeholder">
+          <i class="bi bi-search"></i>
+          <p>輸入手機號碼並點擊查詢</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
 
   <!-- 前台邏輯 -->
   <script src="/js/app.js"></script>

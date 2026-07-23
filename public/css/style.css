@@ -732,11 +732,14 @@ body:not(.sf-body) {
   color: #1a1126 !important;
   font-size: 0.65rem !important;
   font-weight: 700 !important;
-  display: flex !important;
   align-items: center !important;
   justify-content: center !important;
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5) !important;
   /* 增加一點陰影讓數字更立體 */
+}
+/* 未隱藏時才顯示為 flex（避免 d-none 被 !important 覆蓋）*/
+.sf-cart-badge:not(.d-none) {
+  display: flex !important;
 }
 
 /* 漢堡選單 */
@@ -2495,4 +2498,659 @@ body:not(.sf-body) {
   background-color: var(--coffee-amber);
   border-radius: 2px;
   margin-top: 12px;
+}
+
+/* ==========================================================================
+   結帳 Modal (Checkout Order Modal)
+   ========================================================================== */
+
+/* ── Backdrop ── */
+.co-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 12, 6, 0.65);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 1100;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+.co-modal-backdrop.active {
+  opacity: 1;
+  pointer-events: all;
+}
+
+/* ── Modal 容器 ── */
+.co-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1101;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  pointer-events: none;
+}
+.co-modal.active {
+  pointer-events: all;
+}
+
+/* ── Modal 內容卡 ── */
+.co-modal-inner {
+  background: linear-gradient(160deg, #fffdf9 0%, #fdf6ec 100%);
+  border: 1px solid rgba(197, 168, 128, 0.3);
+  border-radius: 24px;
+  box-shadow:
+    0 32px 80px -12px rgba(50, 34, 20, 0.25),
+    0 0 0 1px rgba(255,255,255,0.6) inset;
+  width: 100%;
+  max-width: 560px;
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transform: translateY(24px) scale(0.97);
+  opacity: 0;
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
+              opacity 0.3s ease;
+}
+.co-modal.active .co-modal-inner {
+  transform: translateY(0) scale(1);
+  opacity: 1;
+}
+
+/* ── Modal Header ── */
+.co-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.4rem 1.6rem 1rem;
+  border-bottom: 1px solid rgba(197, 168, 128, 0.2);
+  flex-shrink: 0;
+}
+.co-modal-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+.co-modal-icon {
+  font-size: 1.5rem;
+  color: var(--sf-gold, #c5a880);
+}
+.co-modal-title {
+  font-family: var(--sf-font-serif, 'Playfair Display', serif);
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--sf-dark, #1a1008);
+  margin: 0;
+}
+.co-modal-close {
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: rgba(139, 90, 43, 0.08);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--sf-muted, #6b5c4e);
+  transition: background 0.2s, color 0.2s;
+  font-size: 0.95rem;
+}
+.co-modal-close:hover {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+}
+
+/* ── Modal Body (滾動區) ── */
+.co-modal-body {
+  overflow-y: auto;
+  padding: 1.4rem 1.6rem;
+  flex: 1;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(197,168,128,0.4) transparent;
+}
+.co-modal-body::-webkit-scrollbar { width: 5px; }
+.co-modal-body::-webkit-scrollbar-thumb {
+  background: rgba(197,168,128,0.4);
+  border-radius: 99px;
+}
+
+/* ── Section Label ── */
+.co-section-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--sf-muted, #6b5c4e);
+  margin: 0 0 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+/* ── 表單區 ── */
+.co-form-section {
+  margin-bottom: 1.6rem;
+}
+.co-form-group {
+  margin-bottom: 1rem;
+}
+.co-form-row {
+  display: grid;
+  gap: 0.8rem;
+}
+.co-label {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--sf-dark, #1a1008);
+  margin-bottom: 0.35rem;
+}
+.co-required {
+  color: #ef4444;
+  margin-left: 2px;
+}
+.co-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.co-input-icon {
+  position: absolute;
+  left: 0.85rem;
+  color: var(--sf-muted, #6b5c4e);
+  font-size: 0.9rem;
+  pointer-events: none;
+  z-index: 1;
+}
+.co-input {
+  width: 100%;
+  padding: 0.65rem 0.9rem 0.65rem 2.4rem;
+  border: 1.5px solid rgba(197, 168, 128, 0.35);
+  border-radius: 12px;
+  background: rgba(255,255,255,0.85);
+  font-size: 0.88rem;
+  color: var(--sf-dark, #1a1008);
+  font-family: var(--sf-font-sans, 'Outfit', sans-serif);
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+  outline: none;
+}
+.co-input:focus {
+  border-color: var(--sf-gold, #c5a880);
+  box-shadow: 0 0 0 3px rgba(197, 168, 128, 0.18);
+  background: #fff;
+}
+.co-input.co-input-autofilled {
+  border-color: #34d399;
+  background: rgba(209, 250, 229, 0.25);
+}
+.co-textarea-wrap { align-items: flex-start; }
+.co-textarea-icon { top: 0.7rem; }
+.co-textarea {
+  resize: none;
+  line-height: 1.5;
+  min-height: 64px;
+}
+.co-hint {
+  font-size: 0.75rem;
+  color: var(--sf-muted, #6b5c4e);
+  margin: 0.3rem 0 0;
+  transition: color 0.2s;
+}
+.co-hint.success { color: #10b981; }
+.co-hint.error   { color: #ef4444; }
+
+/* ── 自動帶入 Spinner ── */
+.co-lookup-spinner {
+  position: absolute;
+  right: 0.85rem;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(197, 168, 128, 0.3);
+  border-top-color: var(--sf-gold, #c5a880);
+  border-radius: 50%;
+  display: none;
+}
+.co-lookup-spinner.spinning {
+  display: block;
+  animation: co-spin 0.7s linear infinite;
+}
+@keyframes co-spin { to { transform: rotate(360deg); } }
+
+/* ── 訂單預覽區 ── */
+.co-order-preview {
+  background: rgba(255,255,255,0.6);
+  border: 1px solid rgba(197, 168, 128, 0.2);
+  border-radius: 16px;
+  padding: 1.1rem 1.2rem;
+}
+.co-order-items {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 0.9rem;
+}
+.co-order-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.4rem 0;
+  border-bottom: 1px dashed rgba(197, 168, 128, 0.2);
+  font-size: 0.84rem;
+}
+.co-order-item:last-child { border-bottom: none; }
+.co-order-item-name {
+  color: var(--sf-dark, #1a1008);
+  font-weight: 500;
+  flex: 1;
+}
+.co-order-item-size {
+  font-size: 0.75rem;
+  color: var(--sf-muted, #6b5c4e);
+  margin-left: 0.4rem;
+}
+.co-order-item-qty {
+  color: var(--sf-muted, #6b5c4e);
+  margin: 0 0.6rem;
+  font-size: 0.8rem;
+}
+.co-order-item-sub {
+  color: var(--sf-gold, #c5a880);
+  font-weight: 700;
+  font-size: 0.88rem;
+  white-space: nowrap;
+}
+.co-order-total-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 0.7rem;
+  border-top: 2px solid rgba(197, 168, 128, 0.35);
+}
+.co-order-total-label {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--sf-dark, #1a1008);
+}
+.co-order-total-value {
+  font-family: var(--sf-font-serif, 'Playfair Display', serif);
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--sf-gold, #c5a880);
+}
+
+/* ── Modal Footer ── */
+.co-modal-footer {
+  display: flex;
+  gap: 0.75rem;
+  padding: 1rem 1.6rem 1.4rem;
+  border-top: 1px solid rgba(197, 168, 128, 0.15);
+  flex-shrink: 0;
+  background: rgba(253, 246, 236, 0.5);
+}
+
+/* ── Buttons ── */
+.co-btn {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  border: none;
+  font-size: 0.9rem;
+  font-weight: 600;
+  font-family: var(--sf-font-sans, 'Outfit', sans-serif);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  transition: all 0.2s ease;
+}
+.co-btn-ghost {
+  background: transparent;
+  border: 1.5px solid rgba(197, 168, 128, 0.4);
+  color: var(--sf-muted, #6b5c4e);
+}
+.co-btn-ghost:hover {
+  background: rgba(197, 168, 128, 0.1);
+  color: var(--sf-dark, #1a1008);
+}
+.co-btn-primary {
+  background: linear-gradient(135deg, var(--sf-gold, #c5a880) 0%, #9a7040 100%);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(197, 168, 128, 0.35);
+}
+.co-btn-primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(197, 168, 128, 0.5);
+}
+.co-btn-primary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ── 送出按鈕 Loading 動畫 ── */
+.co-dot-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255,255,255,0.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: co-spin 0.7s linear infinite;
+}
+
+/* ── RWD ── */
+@media (max-width: 480px) {
+  .co-modal-inner { border-radius: 20px 20px 0 0; }
+  .co-modal { align-items: flex-end; padding: 0; }
+  .co-modal-inner {
+    max-height: 96vh;
+    border-radius: 20px 20px 0 0;
+    transform: translateY(100%);
+  }
+  .co-modal.active .co-modal-inner { transform: translateY(0); }
+  .co-modal-footer { flex-direction: column-reverse; }
+  .co-btn { flex: none; width: 100%; }
+}
+
+/* ==========================================================================
+   導覽列「查詢訂單」按鈕
+   ========================================================================== */
+.sf-order-lookup-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.42rem 0.9rem;
+  border: 1.5px solid rgba(197, 168, 128, 0.4);
+  border-radius: 20px;
+  background: transparent;
+  color: var(--sf-gold, #c5a880);
+  font-size: 0.82rem;
+  font-weight: 600;
+  font-family: var(--sf-font-sans, 'Outfit', sans-serif);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.2s, border-color 0.2s, color 0.2s, transform 0.15s;
+}
+.sf-order-lookup-btn:hover {
+  background: rgba(197, 168, 128, 0.12);
+  border-color: var(--sf-gold, #c5a880);
+  color: var(--sf-gold-light, #dfc9a3);
+  transform: translateY(-1px);
+}
+.sf-order-lookup-btn i { font-size: 0.9rem; }
+@media (max-width: 540px) {
+  .sf-order-lookup-label { display: none; }
+  .sf-order-lookup-btn { padding: 0.42rem 0.6rem; border-radius: 50%; }
+}
+
+/* ==========================================================================
+   訂單成功 Modal (sm-*)
+   ========================================================================== */
+.sm-inner {
+  max-width: 460px;
+  text-align: center;
+  padding-bottom: 0;
+}
+
+/* 成功英雄區 */
+.sm-hero {
+  padding: 2.2rem 1.6rem 1.2rem;
+}
+
+/* 打勾圓環動畫 */
+.sm-check-ring {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #34d399 0%, #059669 100%);
+  color: #fff;
+  font-size: 2rem;
+  margin-bottom: 1rem;
+  box-shadow: 0 8px 24px rgba(52, 211, 153, 0.35);
+  animation: sm-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@keyframes sm-pop {
+  from { transform: scale(0.4); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
+}
+
+.sm-title {
+  font-family: var(--sf-font-serif, 'Playfair Display', serif);
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--sf-dark, #1a1008);
+  margin: 0 0 0.4rem;
+}
+.sm-subtitle {
+  font-size: 0.85rem;
+  color: var(--sf-muted, #6b5c4e);
+  margin: 0;
+}
+
+/* 訂單資訊卡 */
+.sm-info-box {
+  background: rgba(255,255,255,0.7);
+  border: 1px solid rgba(197, 168, 128, 0.25);
+  border-radius: 14px;
+  margin: 0 1.6rem 1.2rem;
+  overflow: hidden;
+}
+.sm-info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.65rem 1rem;
+  border-bottom: 1px solid rgba(197, 168, 128, 0.12);
+  font-size: 0.85rem;
+}
+.sm-info-row:last-child { border-bottom: none; }
+.sm-info-label { color: var(--sf-muted, #6b5c4e); }
+.sm-info-value { font-weight: 600; color: var(--sf-dark, #1a1008); }
+.sm-order-id {
+  font-family: var(--sf-font-serif, 'Playfair Display', serif);
+  font-size: 1rem;
+  color: var(--sf-gold, #c5a880);
+  letter-spacing: 0.04em;
+}
+
+/* LINE 按鈕 */
+.sm-line-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  margin: 0 1.6rem 0.6rem;
+  padding: 0.85rem 1.2rem;
+  background: #06c755;
+  border-radius: 14px;
+  color: #fff;
+  font-size: 0.92rem;
+  font-weight: 700;
+  text-decoration: none;
+  font-family: var(--sf-font-sans, 'Outfit', sans-serif);
+  box-shadow: 0 4px 14px rgba(6, 199, 85, 0.3);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.sm-line-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(6, 199, 85, 0.4);
+  color: #fff;
+}
+.sm-line-icon {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+/* 複製提示 */
+.sm-copy-hint {
+  font-size: 0.78rem;
+  color: #10b981;
+  min-height: 1.2em;
+  margin: 0 1.6rem 0.8rem;
+  text-align: center;
+}
+
+/* 關閉按鈕 */
+.sm-close-btn {
+  width: calc(100% - 3.2rem);
+  margin: 0 1.6rem 1.4rem;
+  flex: none;
+}
+
+/* ==========================================================================
+   歷史訂單查詢 Modal (lm-*)
+   ========================================================================== */
+.lm-inner {
+  max-width: 600px;
+  max-height: 88vh;
+}
+
+/* 搜尋列 */
+.lm-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.8rem 1.6rem 0.8rem;
+  border-bottom: 1px solid rgba(197, 168, 128, 0.15);
+  flex-shrink: 0;
+}
+.lm-search-btn {
+  flex: 0 0 auto;
+  padding: 0.65rem 1.1rem;
+  border-radius: 12px;
+  font-size: 0.88rem;
+  white-space: nowrap;
+}
+
+/* 查詢結果區 */
+.lm-results {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.8rem 1.4rem 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(197,168,128,0.3) transparent;
+}
+.lm-results::-webkit-scrollbar { width: 4px; }
+.lm-results::-webkit-scrollbar-thumb { background: rgba(197,168,128,0.3); border-radius: 99px; }
+
+/* 空狀態 / 佔位 */
+.lm-placeholder {
+  text-align: center;
+  padding: 2.5rem 1rem;
+  color: var(--sf-muted, #6b5c4e);
+}
+.lm-placeholder i { font-size: 2.5rem; display: block; margin-bottom: 0.7rem; opacity: 0.4; }
+.lm-placeholder p { font-size: 0.88rem; margin: 0; }
+
+.lm-error {
+  text-align: center;
+  color: #ef4444;
+  font-size: 0.88rem;
+  padding: 1.5rem;
+}
+
+/* 訂單卡片 */
+.lm-order-card {
+  background: rgba(255,255,255,0.75);
+  border: 1px solid rgba(197, 168, 128, 0.22);
+  border-radius: 16px;
+  padding: 1rem 1.1rem 0.85rem;
+  transition: box-shadow 0.2s;
+}
+.lm-order-card:hover {
+  box-shadow: 0 6px 20px rgba(50, 34, 20, 0.08);
+}
+
+/* 卡片標頭 */
+.lm-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.3rem;
+}
+.lm-card-id {
+  font-family: var(--sf-font-serif, 'Playfair Display', serif);
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--sf-gold, #c5a880);
+  letter-spacing: 0.03em;
+}
+.lm-card-date {
+  font-size: 0.75rem;
+  color: var(--sf-muted, #6b5c4e);
+  margin: 0 0 0.75rem;
+}
+
+/* 狀態 Badge */
+.lm-status-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.3rem 0.7rem;
+  border-radius: 20px;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+.lm-status-warning  { background: rgba(245,158,11,0.15);  color: #b45309; }
+.lm-status-primary  { background: rgba(59,130,246,0.15);  color: #1d4ed8; }
+.lm-status-purple   { background: rgba(139,92,246,0.15);  color: #6d28d9; }
+.lm-status-success  { background: rgba(16,185,129,0.15);  color: #065f46; }
+.lm-status-danger   { background: rgba(239,68,68,0.15);   color: #991b1b; }
+.lm-status-secondary{ background: rgba(100,100,100,0.12); color: #4b5563; }
+
+/* 明細列表 */
+.lm-items-list {
+  border-top: 1px dashed rgba(197,168,128,0.2);
+  border-bottom: 1px dashed rgba(197,168,128,0.2);
+  padding: 0.5rem 0;
+  margin-bottom: 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.lm-item-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+}
+.lm-item-name { flex: 1; color: var(--sf-dark, #1a1008); font-weight: 500; }
+.lm-item-qty  { color: var(--sf-muted, #6b5c4e); white-space: nowrap; }
+.lm-item-sub  { color: var(--sf-gold, #c5a880); font-weight: 600; white-space: nowrap; }
+
+/* 總金額列 */
+.lm-total-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.lm-total-row span:first-child { color: var(--sf-muted, #6b5c4e); }
+.lm-total-val {
+  font-family: var(--sf-font-serif, 'Playfair Display', serif);
+  font-size: 1.05rem;
+  color: var(--sf-gold, #c5a880);
+}
+
+/* 備註 */
+.lm-note {
+  font-size: 0.75rem;
+  color: var(--sf-muted, #6b5c4e);
+  margin: 0.5rem 0 0;
+  padding: 0.4rem 0.6rem;
+  background: rgba(197,168,128,0.07);
+  border-radius: 8px;
+  border-left: 3px solid rgba(197,168,128,0.4);
 }
