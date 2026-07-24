@@ -78,67 +78,8 @@ router.get('/customer/:phone', async (req, res) => {
   }
 
   try {
-    const { Pool } = require('pg');
-    // 直接使用 db 模組底層的 pool（透過 db.js 尚未暴露 pool，改用 env 直連）
-    const pool = new (require('pg').Pool)({
-      user:     process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      host:     process.env.DB_HOST,
-      database: process.env.DB_DATABASE,
-      port:     parseInt(process.env.DB_PORT || '5433')
-    });
-
-    // 查主表
-    const ordersResult = await pool.query(
-      `SELECT id, customer_phone, customer_name, shipping_address,
-              total_amount, note, status, created_at
-       FROM orders
-       WHERE customer_phone = $1
-       ORDER BY created_at DESC`,
-      [String(phone).trim()]
-    );
-
-    if (ordersResult.rows.length === 0) {
-      await pool.end();
-      return res.json({ success: true, orders: [] });
-    }
-
-    // 批次查詢所有相關明細
-    const orderIds = ordersResult.rows.map(r => r.id);
-    const itemsResult = await pool.query(
-      `SELECT order_id, product_id, product_name, price, quantity, options, subtotal
-       FROM order_items
-       WHERE order_id = ANY($1)`,
-      [orderIds]
-    );
-    await pool.end();
-
-    // 組裝
-    const itemsMap = {};
-    itemsResult.rows.forEach(item => {
-      if (!itemsMap[item.order_id]) itemsMap[item.order_id] = [];
-      itemsMap[item.order_id].push({
-        productId:   item.product_id,
-        productName: item.product_name,
-        price:       Number(item.price),
-        quantity:    Number(item.quantity),
-        options:     item.options || null,
-        subtotal:    Number(item.subtotal)
-      });
-    });
-
-    const orders = ordersResult.rows.map(r => ({
-      id:              r.id,
-      customerPhone:   r.customer_phone,
-      customerName:    r.customer_name,
-      shippingAddress: r.shipping_address,
-      totalAmount:     Number(r.total_amount),
-      note:            r.note,
-      status:          r.status,
-      createdAt:       r.created_at,
-      items:           itemsMap[r.id] || []
-    }));
-
+    // 使用 db.js 中已正確設定的連線池，避免重複建立 Pool 且連線參數錯誤
+    const orders = await db.getOrdersByPhone(String(phone).trim());
     res.json({ success: true, orders });
   } catch (err) {
     console.error('❌ [GET /api/orders/customer/:phone] 查詢失敗:', err.message);

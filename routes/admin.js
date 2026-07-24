@@ -61,4 +61,46 @@ router.post('/business-hours', async (req, res) => {
   }
 });
 
+// ─── GET /api/admin/orders ────────────────────────────────────────────────────
+// 後台訂單列表，支援 ?status= 篩選，含完整明細，由新到舊排序
+const VALID_ORDER_STATUSES = ['pending', 'confirmed', 'shipped', 'completed', 'cancelled'];
+
+router.get('/orders', async (req, res) => {
+  try {
+    const { status } = req.query;
+    const statusFilter = (status && VALID_ORDER_STATUSES.includes(status)) ? status : null;
+    const orders = await db.getAdminOrders(statusFilter);
+    res.json({ success: true, orders });
+  } catch (err) {
+    console.error('❌ [GET /api/admin/orders] 查詢失敗:', err.message);
+    res.status(500).json({ success: false, message: '查詢訂單失敗：' + err.message });
+  }
+});
+
+// ─── PATCH /api/admin/orders/:id/status ──────────────────────────────────────
+// 變更訂單狀態（含可選的備註更新）
+router.patch('/orders/:id/status', async (req, res) => {
+  const { id } = req.params;
+  const { status, note } = req.body;
+
+  if (!status || !VALID_ORDER_STATUSES.includes(status)) {
+    return res.status(400).json({
+      success: false,
+      message: `狀態值無效，允許值為：${VALID_ORDER_STATUSES.join('、')}`
+    });
+  }
+
+  try {
+    const updated = await db.updateOrderStatus(id, status, note !== undefined ? note : null);
+    if (!updated) {
+      return res.status(404).json({ success: false, message: '找不到指定訂單。' });
+    }
+    console.log(`✅ [PATCH /api/admin/orders/${id}/status] 狀態更新為: ${status}`);
+    res.json({ success: true, message: '訂單狀態已更新。' });
+  } catch (err) {
+    console.error(`❌ [PATCH /api/admin/orders/${id}/status] 更新失敗:`, err.message);
+    res.status(500).json({ success: false, message: '更新訂單狀態失敗：' + err.message });
+  }
+});
+
 module.exports = router;

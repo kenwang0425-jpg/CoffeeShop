@@ -720,8 +720,20 @@
     checkoutBackdrop.classList.add('active');
     checkoutModal.classList.add('active');
     document.body.style.overflow = 'hidden';
-    // 聚焦到手機號碼欄
-    setTimeout(() => coPhone.focus(), 350);
+
+    // ── 若手機號碼欄已有值，主動觸發自動帶入 ──
+    const existingPhone = coPhone.value.trim();
+    if (existingPhone.length >= 10) {
+      // 重置快取，確保即使號碼相同也能重新查詢
+      lastLookedUpPhone = '';
+      setTimeout(() => {
+        lookupCustomer(existingPhone);
+        coPhone.focus();
+      }, 350);
+    } else {
+      // 聚焦到手機號碼欄
+      setTimeout(() => coPhone.focus(), 350);
+    }
   }
 
   /** 關閉 Modal */
@@ -762,6 +774,7 @@
 
   // ── 手機號碼自動帶入邏輯 ──────────────────────────────
   let lastLookedUpPhone = '';
+  let phoneInputTimer   = null;
 
   async function lookupCustomer(phone) {
     if (!phone || phone.length < 10 || phone === lastLookedUpPhone) return;
@@ -797,18 +810,27 @@
     }
   }
 
-  // onBlur 或輸入滿 10 碼時觸發查詢
+  // blur：失焦時觸發查詢（10 碼以上）
   coPhone.addEventListener('blur', () => {
     const phone = coPhone.value.trim();
-    if (phone.length >= 9) lookupCustomer(phone);
+    if (phone.length >= 10) lookupCustomer(phone);
   });
+
+  // input：防抖 500ms；使用者修改號碼時重置快取與 autofill 樣式
   coPhone.addEventListener('input', () => {
     const phone = coPhone.value.trim();
-    if (phone.length === 10) lookupCustomer(phone);
-    // 若使用者改了手機號，重置 autofill 狀態
+
+    // 號碼有變動 → 立即清除 autofill 標示並重置快取，保證下次能觸發查詢
     if (phone !== lastLookedUpPhone) {
+      lastLookedUpPhone = '';
       coName.classList.remove('co-input-autofilled');
       coAddress.classList.remove('co-input-autofilled');
+    }
+
+    // 防抖：輸入停頓 500ms 後，若達 10 碼則查詢
+    clearTimeout(phoneInputTimer);
+    if (phone.length >= 10) {
+      phoneInputTimer = setTimeout(() => lookupCustomer(phone), 500);
     }
   });
 

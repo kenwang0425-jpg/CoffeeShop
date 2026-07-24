@@ -791,6 +791,161 @@ async function getCustomerByPhone(phone) {
 // ============================================================
 
 /**
+ * 依電話號碼查詢顧客所有歷史訂單（含明細），由新到舊排序
+ * @param {string} phone
+ * @returns {Array} 訂單陣列，每筆含 items 明細
+ */
+async function getOrdersByPhone(phone) {
+  if (!pool) {
+    throw new Error('資料庫未啟用，無法查詢訂單。');
+  }
+  // 查詢主表（排除已取消訂單，顧客端不顯示）
+  const ordersResult = await pool.query(
+    `SELECT id, customer_phone, customer_name, shipping_address,
+            total_amount, note, status, created_at
+     FROM orders
+     WHERE customer_phone = $1
+       AND status != 'cancelled'
+     ORDER BY created_at DESC`,
+    [String(phone).trim()]
+  );
+
+  if (ordersResult.rows.length === 0) return [];
+
+  // 批次查詢所有相關明細
+  const orderIds = ordersResult.rows.map(r => r.id);
+  const itemsResult = await pool.query(
+    `SELECT order_id, product_id, product_name, price, quantity, options, subtotal
+     FROM order_items
+     WHERE order_id = ANY($1)`,
+    [orderIds]
+  );
+
+  // 組裝明細 Map
+  const itemsMap = {};
+  itemsResult.rows.forEach(item => {
+    if (!itemsMap[item.order_id]) itemsMap[item.order_id] = [];
+    itemsMap[item.order_id].push({
+      productId:   item.product_id,
+      productName: item.product_name,
+      price:       Number(item.price),
+      quantity:    Number(item.quantity),
+      options:     item.options || null,
+      subtotal:    Number(item.subtotal)
+    });
+  });
+
+  return ordersResult.rows.map(r => ({
+    id:              r.id,
+    customerPhone:   r.customer_phone,
+    customerName:    r.customer_name,
+    shippingAddress: r.shipping_address,
+    totalAmount:     Number(r.total_amount),
+    note:            r.note,
+    status:          r.status,
+    createdAt:       r.created_at,
+    items:           itemsMap[r.id] || []
+  }));
+}
+
+/**
+ * 後台：查詢訂單列表（依狀態篩選），含明細，由新到舊排序
+ * @param {string|null} statusFilter  'pending'|'confirmed'|'shipped'|'completed'|'cancelled'|null(全部)
+ * @returns {Array}
+ */
+async function getAdminOrders(statusFilter) {
+  if (!pool) {
+    throw new Error('資料庫未啟用，無法查詢訂單。');
+  }
+
+  const VALID_STATUSES = ['pending', 'confirmed', 'shipped', 'completed', 'cancelled'];
+  const useFilter = statusFilter && VALID_STATUSES.includes(statusFilter);
+
+  // 查詢主表
+  const ordersResult = useFilter
+    ? await pool.query(
+        `SELECT id, customer_phone, customer_name, shipping_address,
+                total_amount, note, status, created_at
+         FROM orders
+         WHERE status = $1
+         ORDER BY created_at DESC`,
+        [statusFilter]
+      )
+    : await pool.query(
+        `SELECT id, customer_phone, customer_name, shipping_address,
+                total_amount, note, status, created_at
+         FROM orders
+         ORDER BY created_at DESC`
+      );
+
+  if (ordersResult.rows.length === 0) return [];
+
+  // 批次查詢所有相關明細
+  const orderIds = ordersResult.rows.map(r => r.id);
+  const itemsResult = await pool.query(
+    `SELECT order_id, product_id, product_name, price, quantity, options, subtotal
+     FROM order_items
+     WHERE order_id = ANY($1)`,
+    [orderIds]
+  );
+
+  // 組裝明細 Map
+  const itemsMap = {};
+  itemsResult.rows.forEach(item => {
+    if (!itemsMap[item.order_id]) itemsMap[item.order_id] = [];
+    itemsMap[item.order_id].push({
+      productId:   item.product_id,
+      productName: item.product_name,
+      price:       Number(item.price),
+      quantity:    Number(item.quantity),
+      options:     item.options || null,
+      subtotal:    Number(item.subtotal)
+    });
+  });
+
+  return ordersResult.rows.map(r => ({
+    id:              r.id,
+    customerPhone:   r.customer_phone,
+    customerName:    r.customer_name,
+    shippingAddress: r.shipping_address,
+    totalAmount:     Number(r.total_amount),
+    note:            r.note,
+    status:          r.status,
+    createdAt:       r.created_at,
+    items:           itemsMap[r.id] || []
+  }));
+}
+
+/**
+ * 後台：更新訂單狀態與備註
+ * @param {string} orderId
+ * @param {string} status
+ * @param {string|null} note
+ * @returns {boolean} 是否成功更新到至少一筆
+ */
+async function updateOrderStatus(orderId, status, note) {
+  if (!pool) {
+    throw new Error('資料庫未啟用，無法更新訂單狀態。');
+  }
+
+  // 決定是否同時更新備註
+  let result;
+  if (note !== undefined && note !== null) {
+    result = await pool.query(
+      `UPDATE orders SET status = $1, note = $2 WHERE id = $3`,
+      [status, note, orderId]
+    );
+  } else {
+    result = await pool.query(
+      `UPDATE orders SET status = $1 WHERE id = $2`,
+      [status, orderId]
+    );
+  }
+
+  return result.rowCount > 0;
+}
+
+/**
  * 建立新訂單（含 Transaction、顧客 UPSERT、主表與明細批次寫入）
  * @param {{ phone, name, address, items, note, totalAmount }} orderData
  * @returns {string} 訂單編號 orderId
@@ -866,5 +1021,6 @@ module.exports = {
   getOrderingGuide, saveOrderingGuide,
   getBusinessHours, saveBusinessHours,
   getProductsByCategory, getCoffeeBeanFilters,
-  getCustomerByPhone, createOrder
+  getCustomerByPhone, getOrdersByPhone, createOrder,
+  getAdminOrders, updateOrderStatus
 };

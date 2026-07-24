@@ -30,6 +30,13 @@
             <span>商品管理</span>
           </a>
         </li>
+        <li class="menu-item" id="menu-orders">
+          <a href="#" style="justify-content:flex-start;">
+            <i class="bi bi-receipt-cutoff"></i>
+            <span>訂單管理</span>
+            <span class="sidebar-badge d-none" id="sidebar-pending-badge">0</span>
+          </a>
+        </li>
         <li class="menu-item" id="menu-ordering">
           <a href="#">
             <i class="bi bi-journal-text"></i>
@@ -193,6 +200,52 @@
                 <i class="bi bi-save-fill me-2"></i>💾 儲存營業時間
               </button>
             </div>
+          </div>
+        </div>
+
+        <!-- ── 訂單管理區塊 ── -->
+        <div id="section-orders" class="d-none">
+          <div class="glass-card">
+
+            <!-- 頂部：待處理提醒 + 刷新 + 烘豆備料單 -->
+            <div class="order-alert-bar" id="order-alert-bar">
+              <i class="bi bi-bell-fill"></i>
+              <span>待處理訂單：<span class="pending-count" id="order-pending-count">0</span> 筆</span>
+              <div style="margin-left:auto;display:flex;gap:0.5rem;align-items:center;">
+                <button class="btn-prep-sheet" id="btn-prep-sheet" title="產生烘豆備料單">
+                  <i class="bi bi-fire me-1"></i>📊 烘豆備料單
+                </button>
+                <button class="btn-refresh-orders" id="btn-refresh-orders">
+                  <i class="bi bi-arrow-clockwise me-1"></i>立即刷新
+                </button>
+              </div>
+            </div>
+
+            <!-- 狀態 Tab 篩選 -->
+            <div class="order-tabs" id="order-tabs">
+              <button class="order-tab active" data-status="">全部</button>
+              <button class="order-tab" data-status="pending">⏳ 待確認</button>
+              <button class="order-tab" data-status="confirmed">✅ 已確認</button>
+              <button class="order-tab" data-status="shipped">📦 已出貨</button>
+              <button class="order-tab" data-status="completed">🎉 已完成</button>
+              <button class="order-tab" data-status="cancelled">❌ 已取消</button>
+            </div>
+
+            <!-- Loading -->
+            <div class="order-loading d-none" id="order-loading">
+              <div class="spinner-border text-warning" role="status" style="width:2.5rem;height:2.5rem;"></div>
+              <p class="mt-3">載入訂單中...</p>
+            </div>
+
+            <!-- 空狀態 -->
+            <div class="order-empty d-none" id="order-empty">
+              <i class="bi bi-inbox"></i>
+              <p>目前沒有符合條件的訂單</p>
+            </div>
+
+            <!-- 訂單卡片容器 -->
+            <div id="order-cards-container"></div>
+
           </div>
         </div>
 
@@ -395,6 +448,34 @@
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- 烘豆備料單 Modal -->
+  <div class="modal fade" id="roast-modal" tabindex="-1" aria-hidden="true" aria-labelledby="roast-modal-title">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content modal-content-custom">
+        <div class="modal-header modal-header-custom">
+          <h5 class="modal-title modal-title-custom" id="roast-modal-title">
+            <i class="bi bi-fire me-2" style="color:#ff8c42;"></i>烘豆與備料統計清單
+          </h5>
+          <button type="button" class="btn-close btn-close-white-custom" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body p-0" id="roast-modal-body">
+          <!-- JS 動態填入 -->
+          <div class="roast-loading d-none" id="roast-loading">
+            <div class="spinner-border text-warning" role="status"></div>
+            <p class="mt-2">統計中...</p>
+          </div>
+          <div id="roast-content"></div>
+        </div>
+        <div class="modal-footer modal-footer-custom">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">關閉</button>
+          <button type="button" class="btn btn-custom-primary" id="btn-print-roast">
+            <i class="bi bi-printer-fill me-2"></i>🖨️ 列印備料單
+          </button>
+        </div>
       </div>
     </div>
   </div>

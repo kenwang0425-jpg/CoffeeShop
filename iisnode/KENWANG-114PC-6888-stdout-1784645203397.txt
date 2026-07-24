@@ -1,9 +1,0 @@
-◇ injected env (7) from .env // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
-◇ injected env (0) from .env // tip: ⌘ override existing { override: true }
-=== 🗄️ 正在初始化資料庫連線... ===
-🔌 [Database] 嘗試連接至 PostgreSQL (192.168.0.202:5433)...
-✅ [Database] PostgreSQL 連線成功！
-📋 [Database] Products, DripBagRecipes, OrderingGuide & BusinessHours 資料表確認完畢。
-=== 🗄️ 資料庫初始化成功！ ===
-🚀 [Server] 伺服器已啟動，正在監聽連接埠: \\.\pipe\29a92700-1e0e-4bef-b4db-6e38c8223cc9
-🔗 [Server] 本地網址: http://localhost:\\.\pipe\29a92700-1e0e-4bef-b4db-6e38c8223cc9

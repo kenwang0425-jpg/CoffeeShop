@@ -22,11 +22,13 @@
   const menuProducts      = $('menu-products');
   const menuOrdering      = $('menu-ordering');
   const menuBusinessHours = $('menu-business-hours');
+  const menuOrders        = $('menu-orders');
 
   // 內容區塊
   const sectionProducts      = $('section-products');
   const sectionOrdering      = $('section-ordering');
   const sectionBusinessHours = $('section-business-hours');
+  const sectionOrders        = $('section-orders');
 
   // 標題
   const pageTitle    = document.querySelector('.page-title');
@@ -89,13 +91,29 @@
   const btnSaveOrdering    = $('btn-save-ordering');
 
   // 營業時間
-  const businessAnnouncement = $('business-announcement');
+  const businessAnnouncement  = $('business-announcement');
   const businessDaysContainer = $('business-days-container');
   const btnSaveBusinessHours  = $('btn-save-business-hours');
+
+  // 訂單管理 DOM
+  const sidebarPendingBadge = $('sidebar-pending-badge');
+  const orderPendingCount   = $('order-pending-count');
+  const btnRefreshOrders    = $('btn-refresh-orders');
+  const orderCardsContainer = $('order-cards-container');
+  const orderLoadingEl      = $('order-loading');
+  const orderEmptyEl        = $('order-empty');
+  const orderTabsEl         = $('order-tabs');
+
+  // 烘豆備料單 DOM
+  const btnPrepSheet    = $('btn-prep-sheet');
+  const btnPrintRoast   = $('btn-print-roast');
+  const roastContent    = $('roast-content');
+  const roastLoadingEl  = $('roast-loading');
 
   // Bootstrap Modal 實例
   let productModalBS = null;
   let deleteModalBS  = null;
+  let roastModalBS   = null;
 
   // ════════════════════════════════════════════════════
   //  State
@@ -108,7 +126,12 @@
   let searchQuery        = '';
   let allCoffeeBeans     = [];     // 用於掛耳包配方下拉
 
+  // 訂單管理 State
+  let activeOrderStatus = '';      // 空字串 = 全部
+  let orderPollTimer    = null;    // 30 秒輪詢計時器
+
   const DAY_NAMES = { 1: '星期一', 2: '星期二', 3: '星期三', 4: '星期四', 5: '星期五', 6: '星期六', 7: '星期日' };
+
 
   // ════════════════════════════════════════════════════
   //  API helpers
@@ -141,8 +164,13 @@
   // ════════════════════════════════════════════════════
   function switchSection(section) {
     // 隱藏全部區塊
-    [sectionProducts, sectionOrdering, sectionBusinessHours].forEach(s => s.classList.add('d-none'));
-    [menuProducts, menuOrdering, menuBusinessHours].forEach(m => m.classList.remove('active'));
+    [sectionProducts, sectionOrdering, sectionBusinessHours, sectionOrders]
+      .forEach(s => { if (s) s.classList.add('d-none'); });
+    [menuProducts, menuOrdering, menuBusinessHours, menuOrders]
+      .forEach(m => { if (m) m.classList.remove('active'); });
+
+    // 離開訂單頁時停止輪詢
+    if (section !== 'orders') stopOrderPolling();
 
     if (section === 'products') {
       sectionProducts.classList.remove('d-none');
@@ -159,12 +187,19 @@
       menuBusinessHours.classList.add('active');
       if (pageTitle) pageTitle.textContent = '營業時間管理';
       loadBusinessHours();
+    } else if (section === 'orders') {
+      sectionOrders.classList.remove('d-none');
+      menuOrders.classList.add('active');
+      if (pageTitle) pageTitle.textContent = '訂單管理';
+      loadOrders(activeOrderStatus);
+      startOrderPolling();
     }
   }
 
   menuProducts.querySelector('a').addEventListener('click', e => { e.preventDefault(); switchSection('products'); });
   menuOrdering.querySelector('a').addEventListener('click', e => { e.preventDefault(); switchSection('ordering'); });
   menuBusinessHours.querySelector('a').addEventListener('click', e => { e.preventDefault(); switchSection('business-hours'); });
+  if (menuOrders) menuOrders.querySelector('a').addEventListener('click', e => { e.preventDefault(); switchSection('orders'); });
 
   // ════════════════════════════════════════════════════
   //  登出
@@ -819,6 +854,406 @@
   }
 
   // ════════════════════════════════════════════════════
+  //  ─── 訂單管理 ───
+  // ════════════════════════════════════════════════════
+
+  const STATUS_LABEL = {
+    pending:   '⏳ 待確認',
+    confirmed: '✅ 已確認',
+    shipped:   '📦 已出貨',
+    completed: '🎉 已完成',
+    cancelled: '❌ 已取消'
+  };
+
+  /** 更新待處理計數 Badge */
+  function updatePendingBadge(n) {
+    if (orderPendingCount) orderPendingCount.textContent = n;
+    if (sidebarPendingBadge) {
+      sidebarPendingBadge.textContent = n;
+      sidebarPendingBadge.classList.toggle('d-none', n === 0);
+    }
+  }
+
+  /** 輪詢控制 */
+  function startOrderPolling() {
+    stopOrderPolling();
+    orderPollTimer = setInterval(() => loadOrders(activeOrderStatus, true), 30000);
+  }
+  function stopOrderPolling() {
+    if (orderPollTimer) { clearInterval(orderPollTimer); orderPollTimer = null; }
+  }
+
+  /** 載入訂單列表 */
+  async function loadOrders(status, silent) {
+    if (!silent) {
+      if (orderLoadingEl) orderLoadingEl.classList.remove('d-none');
+      if (orderEmptyEl)   orderEmptyEl.classList.add('d-none');
+      if (orderCardsContainer) orderCardsContainer.innerHTML = '';
+    }
+    try {
+      const url = status ? '/api/admin/orders?status=' + encodeURIComponent(status) : '/api/admin/orders';
+      const json = await apiFetch(url);
+      const orders = json.orders || [];
+
+      // 無篩選時可準確計算待確認數
+      if (!status) {
+        const pCount = orders.filter(function(o) { return o.status === 'pending'; }).length;
+        updatePendingBadge(pCount);
+      }
+
+      if (orderLoadingEl) orderLoadingEl.classList.add('d-none');
+      if (orders.length === 0) {
+        if (orderEmptyEl) orderEmptyEl.classList.remove('d-none');
+      } else {
+        renderOrderCards(orders);
+      }
+    } catch (err) {
+      if (orderLoadingEl) orderLoadingEl.classList.add('d-none');
+      showAlert('載入訂單失敗：' + err.message, 'danger');
+    }
+  }
+
+  /** 渲染訂單卡片 */
+  function renderOrderCards(orders) {
+    if (!orderCardsContainer) return;
+    orderCardsContainer.innerHTML = '';
+
+    orders.forEach(function(order, idx) {
+      var card = document.createElement('div');
+      card.className = 'order-card';
+      card.style.animationDelay = (idx * 0.04) + 's';
+
+      var dateStr = '';
+      if (order.createdAt) {
+        dateStr = new Date(order.createdAt).toLocaleString('zh-TW', {
+          year: 'numeric', month: '2-digit', day: '2-digit',
+          hour: '2-digit', minute: '2-digit'
+        });
+      }
+
+      var itemRows = (order.items || []).map(function(it) {
+        var size = (it.options && it.options.size) ? ' (' + escHtml(it.options.size) + ')' : '';
+        return '<tr>' +
+          '<td>' + escHtml(it.productName) + size + '</td>' +
+          '<td class="text-right">x' + it.quantity + '</td>' +
+          '<td class="text-right">NT$ ' + fmtNum(it.price) + '</td>' +
+          '<td class="text-right">NT$ ' + fmtNum(it.subtotal) + '</td>' +
+          '</tr>';
+      }).join('');
+
+      var statusSel = '';
+      ['pending','confirmed','shipped','completed','cancelled'].forEach(function(s) {
+        statusSel += '<option value="' + s + '"' + (order.status === s ? ' selected' : '') + '>'
+          + (STATUS_LABEL[s] || s) + '</option>';
+      });
+
+      card.innerHTML =
+        '<div class="order-card-header">' +
+          '<span class="order-id">' + escHtml(order.id) + '</span>' +
+          '<span class="order-time">' + escHtml(dateStr) + '</span>' +
+          '<span class="order-status-badge ' + escHtml(order.status) + '" id="badge-' + escHtml(order.id) + '">' +
+            (STATUS_LABEL[order.status] || order.status) +
+          '</span>' +
+        '</div>' +
+        '<div class="order-customer-row">' +
+          '<span><span class="label">姓名</span>' + escHtml(order.customerName || '—') + '</span>' +
+          '<span><span class="label">手機</span>' +
+            '<a href="tel:' + escHtml(order.customerPhone) + '">' + escHtml(order.customerPhone) + '</a>' +
+          '</span>' +
+          '<span><span class="label">地址</span>' + escHtml(order.shippingAddress || '—') + '</span>' +
+        '</div>' +
+        '<table class="order-items-table">' +
+          '<thead><tr><th>品項</th><th class="text-right">數量</th><th class="text-right">單價</th><th class="text-right">小計</th></tr></thead>' +
+          '<tbody>' + itemRows + '</tbody>' +
+        '</table>' +
+        '<div class="order-total-row">' +
+          '<span class="total-label">訂單總額</span>' +
+          '<span class="total-amount">NT$ ' + fmtNum(order.totalAmount) + '</span>' +
+        '</div>' +
+        '<div class="order-action-row">' +
+          '<div class="order-action-group" style="max-width:185px;">' +
+            '<span class="order-action-label">變更狀態</span>' +
+            '<select class="order-status-select" id="status-sel-' + escHtml(order.id) + '" data-order-id="' + escHtml(order.id) + '">' +
+              statusSel +
+            '</select>' +
+          '</div>' +
+          '<div class="order-action-group" style="flex:2;">' +
+            '<span class="order-action-label">備註 / 物流單號</span>' +
+            '<textarea class="order-note-input" rows="1" ' +
+              'id="note-inp-' + escHtml(order.id) + '" ' +
+              'data-order-id="' + escHtml(order.id) + '" ' +
+              'placeholder="可填寫物流單號或備註...">' +
+              escHtml(order.note || '') +
+            '</textarea>' +
+          '</div>' +
+          '<button class="btn-save-order-note" data-order-id="' + escHtml(order.id) + '" id="note-btn-' + escHtml(order.id) + '">' +
+            '<i class="bi bi-save me-1"></i>儲存備註' +
+          '</button>' +
+        '</div>';
+
+      orderCardsContainer.appendChild(card);
+    });
+
+    // 狀態 Select 事件
+    orderCardsContainer.querySelectorAll('.order-status-select').forEach(function(sel) {
+      sel.dataset.prevStatus = sel.value;
+      sel.addEventListener('change', async function() {
+        var orderId   = sel.dataset.orderId;
+        var newStatus = sel.value;
+        try {
+          await apiFetch('/api/admin/orders/' + encodeURIComponent(orderId) + '/status', {
+            method: 'PATCH',
+            body: JSON.stringify({ status: newStatus })
+          });
+          var badge = $('badge-' + orderId);
+          if (badge) {
+            badge.className = 'order-status-badge ' + newStatus;
+            badge.textContent = STATUS_LABEL[newStatus] || newStatus;
+          }
+          sel.dataset.prevStatus = newStatus;
+          showAlert('訂單狀態已更新');
+          // 若有篩選且狀態改變，重新載入以移除該卡片
+          if (activeOrderStatus && newStatus !== activeOrderStatus) {
+            loadOrders(activeOrderStatus);
+          }
+        } catch (err) {
+          showAlert('狀態更新失敗：' + err.message, 'danger');
+          sel.value = sel.dataset.prevStatus;
+        }
+      });
+    });
+
+    // 備註儲存事件
+    orderCardsContainer.querySelectorAll('.btn-save-order-note').forEach(function(btn) {
+      btn.addEventListener('click', async function() {
+        var orderId = btn.dataset.orderId;
+        var noteEl  = $('note-inp-' + orderId);
+        var selEl   = $('status-sel-' + orderId);
+        if (!noteEl || !selEl) return;
+        try {
+          await apiFetch('/api/admin/orders/' + encodeURIComponent(orderId) + '/status', {
+            method: 'PATCH',
+            body: JSON.stringify({ status: selEl.value, note: noteEl.value.trim() })
+          });
+          showAlert('備註已儲存');
+        } catch (err) {
+          showAlert('備註儲存失敗：' + err.message, 'danger');
+        }
+      });
+    });
+  }
+
+  // Tab 切換
+  if (orderTabsEl) {
+    orderTabsEl.addEventListener('click', function(e) {
+      var tab = e.target.closest('.order-tab');
+      if (!tab) return;
+      orderTabsEl.querySelectorAll('.order-tab').forEach(function(t) { t.classList.remove('active'); });
+      tab.classList.add('active');
+      activeOrderStatus = tab.dataset.status || '';
+      loadOrders(activeOrderStatus);
+    });
+  }
+
+  // 立即刷新按鈕
+  if (btnRefreshOrders) {
+    btnRefreshOrders.addEventListener('click', function() { loadOrders(activeOrderStatus); });
+  }
+
+  /** 數字格式化 */
+  function fmtNum(n) {
+    return Number(n || 0).toLocaleString('zh-TW');
+  }
+
+  // ════════════════════════════════════════════════════
+  //  ─── 烘豆備料單 ───
+  // ════════════════════════════════════════════════════
+
+  /**
+   * 規格關鍵字 → 磅數換算表
+   * 半磅 = 0.5 lb, 一磅 / 整磅 = 1 lb, 其他預設 0（只計組數不計磅）
+   */
+  var POUND_MAP = [
+    { keywords: ['半磅', '1/2lb', '0.5lb', '半 磅'],  lbs: 0.5 },
+    { keywords: ['一磅', '1lb', '1 lb', '整磅', '一 磅'], lbs: 1   },
+    { keywords: ['二磅', '2lb', '2 lb'],                lbs: 2   }
+  ];
+
+  function guessLbs(productName, options) {
+    var target = ((productName || '') + ' ' + ((options && options.size) || '')).toLowerCase();
+    for (var i = 0; i < POUND_MAP.length; i++) {
+      var entry = POUND_MAP[i];
+      for (var j = 0; j < entry.keywords.length; j++) {
+        if (target.indexOf(entry.keywords[j].toLowerCase()) !== -1) {
+          return entry.lbs;
+        }
+      }
+    }
+    return null; // 無法對應磅數，歸為「其他/掛耳」
+  }
+
+  /**
+   * 從 confirmed 訂單聚合統計
+   * @returns {{ beans: Object, others: Object, orderCount: number }}
+   */
+  function buildPrepSheet(orders) {
+    var beans  = {};   // key: "品名|規格" → { name, size, qty, totalLbs }
+    var others = {};   // key: "品名|規格" → { name, size, qty }
+
+    orders.forEach(function(order) {
+      (order.items || []).forEach(function(it) {
+        var size   = (it.options && it.options.size) ? it.options.size : '';
+        var key    = it.productName + (size ? ' | ' + size : '');
+        var lbs    = guessLbs(it.productName, it.options);
+        var isBean = lbs !== null;
+
+        if (isBean) {
+          if (!beans[key]) beans[key] = { name: it.productName, size: size, qty: 0, totalLbs: 0 };
+          beans[key].qty      += it.quantity;
+          beans[key].totalLbs += it.quantity * lbs;
+        } else {
+          if (!others[key]) others[key] = { name: it.productName, size: size, qty: 0 };
+          others[key].qty += it.quantity;
+        }
+      });
+    });
+
+    return { beans: beans, others: others, orderCount: orders.length };
+  }
+
+  /** 渲染統計表格（用於 Modal 內容） */
+  function renderRoastModal(orders) {
+    if (!roastContent) return;
+    var data = buildPrepSheet(orders);
+    var now  = new Date().toLocaleString('zh-TW', {
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit'
+    });
+
+    var beanKeys  = Object.keys(data.beans);
+    var otherKeys = Object.keys(data.others);
+
+    // ── 咖啡豆彙整 ──
+    var beanRows = '';
+    var totalLbs = 0;
+    beanKeys.sort().forEach(function(k) {
+      var r = data.beans[k];
+      totalLbs += r.totalLbs;
+      beanRows +=
+        '<tr>' +
+          '<td>' + escHtml(r.name) + '</td>' +
+          '<td>' + escHtml(r.size || '—') + '</td>' +
+          '<td class="num">' + r.qty + ' 袋</td>' +
+          '<td class="num">' + r.totalLbs.toFixed(1) + ' 磅</td>' +
+        '</tr>';
+    });
+    if (!beanRows) {
+      beanRows = '<tr><td colspan="4" class="roast-empty-hint">目前無待烘焙咖啡豆訂單</td></tr>';
+    }
+    var beanFooter = beanKeys.length
+      ? '<tfoot><tr>' +
+          '<td colspan="2"><strong>合計</strong></td>' +
+          '<td class="num"><strong>' + beanKeys.reduce(function(s,k){ return s + data.beans[k].qty; }, 0) + ' 袋</strong></td>' +
+          '<td class="num"><strong>' + totalLbs.toFixed(1) + ' 磅</strong></td>' +
+        '</tr></tfoot>'
+      : '';
+
+    var beanSection =
+      '<div class="roast-section">' +
+        '<div class="roast-section-title">🔥 待烘焙咖啡豆彙整</div>' +
+        '<table class="roast-table">' +
+          '<thead><tr>' +
+            '<th>品名</th>' +
+            '<th>規格</th>' +
+            '<th class="num">袋數</th>' +
+            '<th class="num">總磅數</th>' +
+          '</tr></thead>' +
+          '<tbody>' + beanRows + '</tbody>' +
+          beanFooter +
+        '</table>' +
+        (beanKeys.length ? '<div class="roast-note">換算依據：半磅 = 0.5 磅、一磅 = 1 磅（若商品名稱含「半磅」或「一磅」字樣自動判斷；如規格顯示「—」請人工核對磅數）。</div>' : '') +
+      '</div>';
+
+    // ── 掛耳包 / 其他品項彙整 ──
+    var otherRows = '';
+    var totalOtherQty = 0;
+    otherKeys.sort().forEach(function(k) {
+      var r = data.others[k];
+      totalOtherQty += r.qty;
+      otherRows +=
+        '<tr>' +
+          '<td>' + escHtml(r.name) + '</td>' +
+          '<td>' + escHtml(r.size || '—') + '</td>' +
+          '<td class="num">' + r.qty + ' 組/件</td>' +
+        '</tr>';
+    });
+    if (!otherRows) {
+      otherRows = '<tr><td colspan="3" class="roast-empty-hint">目前無掛耳包 / 配件訂單</td></tr>';
+    }
+    var otherFooter = otherKeys.length
+      ? '<tfoot><tr>' +
+          '<td colspan="2"><strong>合計</strong></td>' +
+          '<td class="num"><strong>' + totalOtherQty + ' 組/件</strong></td>' +
+        '</tr></tfoot>'
+      : '';
+
+    var otherSection =
+      '<div class="roast-section">' +
+        '<div class="roast-section-title">📦 掛耳包 / 配件備貨彙整</div>' +
+        '<table class="roast-table">' +
+          '<thead><tr>' +
+            '<th>品名</th>' +
+            '<th>規格</th>' +
+            '<th class="num">組數 / 件數</th>' +
+          '</tr></thead>' +
+          '<tbody>' + otherRows + '</tbody>' +
+          otherFooter +
+        '</table>' +
+      '</div>';
+
+    // ── 組合 HTML ──
+    roastContent.innerHTML =
+      '<div class="roast-sheet">' +
+        '<div class="roast-print-title">KAKAMA COFFEE ── 烘豆與備料統計清單</div>' +
+        '<div class="roast-meta">' +
+          '<span>統計基礎：<strong>已確認 (confirmed) 訂單</strong></span>' +
+          '<span>訂單筆數：<strong>' + data.orderCount + ' 筆</strong></span>' +
+          '<span>產出時間：<strong>' + escHtml(now) + '</strong></span>' +
+        '</div>' +
+        beanSection +
+        otherSection +
+      '</div>';
+  }
+
+  /** 開啟備料單 Modal */
+  async function openPrepSheet() {
+    if (!roastModalBS) return;
+    if (roastContent)   roastContent.innerHTML = '';
+    if (roastLoadingEl) roastLoadingEl.classList.remove('d-none');
+    roastModalBS.show();
+    try {
+      var json   = await apiFetch('/api/admin/orders?status=confirmed');
+      var orders = json.orders || [];
+      if (roastLoadingEl) roastLoadingEl.classList.add('d-none');
+      renderRoastModal(orders);
+    } catch (err) {
+      if (roastLoadingEl) roastLoadingEl.classList.add('d-none');
+      if (roastContent) roastContent.innerHTML =
+        '<div class="roast-sheet"><p style="color:#e85d5d;padding:1rem;">載入失敗：' + escHtml(err.message) + '</p></div>';
+    }
+  }
+
+  // 「烘豆備料單」按鈕事件
+  if (btnPrepSheet) {
+    btnPrepSheet.addEventListener('click', function() { openPrepSheet(); });
+  }
+
+  // 「列印備料單」按鈕事件
+  if (btnPrintRoast) {
+    btnPrintRoast.addEventListener('click', function() { window.print(); });
+  }
+
+  // ════════════════════════════════════════════════════
   //  工具函式
   // ════════════════════════════════════════════════════
   function escHtml(str) {
@@ -834,17 +1269,27 @@
     // Bootstrap Modal 初始化
     const productModalEl = $('product-modal');
     const deleteModalEl  = $('delete-modal');
+    const roastModalEl   = $('roast-modal');
     if (productModalEl) productModalBS = new bootstrap.Modal(productModalEl);
     if (deleteModalEl)  deleteModalBS  = new bootstrap.Modal(deleteModalEl);
+    if (roastModalEl)   roastModalBS   = new bootstrap.Modal(roastModalEl);
 
     initUserInfo();
     loadProducts(); // 預設顯示商品管理
+
+    // 頁面啟動時先載入待確認數量，更新 sidebar badge
+    apiFetch('/api/admin/orders?status=pending')
+      .then(function(json) {
+        updatePendingBadge((json.orders || []).length);
+      })
+      .catch(function() {});
   }
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {
     init();
+
   }
 
 })();
