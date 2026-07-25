@@ -60,13 +60,18 @@
   const fldPackageNotes   = $('product-package-notes');
   const fldUnit1          = $('product-unit-1');
   const fldPrice1         = $('product-price-1');
+  const fldStock1         = $('product-stock-1');
+  const fldStockUnit1     = $('product-stock-unit-1');
   const fldUnit2          = $('product-unit-2');
   const fldPrice2         = $('product-price-2');
+  const fldStock2         = $('product-stock-2');
+  const fldStockUnit2     = $('product-stock-unit-2');
   const fldUnit3          = $('product-unit-3');
   const fldPrice3         = $('product-price-3');
+  const fldStock3         = $('product-stock-3');
+  const fldStockUnit3     = $('product-stock-unit-3');
   const fldOriginalPrice  = $('product-original-price');
   const fldSalePrice      = $('product-sale-price');
-  const fldStock          = $('product-stock');
   const fldFlavor         = $('product-flavor');
   const fldIsLimited      = $('product-is-limited');
   const recipeContainer   = $('recipe-list-container');
@@ -309,7 +314,25 @@
       const catColor = p.category === '咖啡豆' ? 'success' :
                        p.category === '掛耳包組' ? 'warning' : 'info';
 
-      tr.innerHTML = `
+        // 庫存摘要：顯示各規格庫存
+        const stockParts = [];
+        if (p.unit_1) {
+          const sv = p.stock_1 !== null && p.stock_1 !== undefined ? p.stock_1 : '—';
+          const sc = (typeof p.stock_1 === 'number' && p.stock_1 <= 0) ? 'text-danger fw-bold' : (typeof p.stock_1 === 'number' ? 'text-success' : 'text-muted');
+          stockParts.push(`<span class="${sc}">${escHtml(p.unit_1)}:${sv}</span>`);
+        }
+        if (p.unit_2) {
+          const sv = p.stock_2 !== null && p.stock_2 !== undefined ? p.stock_2 : '—';
+          const sc = (typeof p.stock_2 === 'number' && p.stock_2 <= 0) ? 'text-danger fw-bold' : (typeof p.stock_2 === 'number' ? 'text-success' : 'text-muted');
+          stockParts.push(`<span class="${sc}">${escHtml(p.unit_2)}:${sv}</span>`);
+        }
+        if (p.unit_3) {
+          const sv = p.stock_3 !== null && p.stock_3 !== undefined ? p.stock_3 : '—';
+          const sc = (typeof p.stock_3 === 'number' && p.stock_3 <= 0) ? 'text-danger fw-bold' : (typeof p.stock_3 === 'number' ? 'text-success' : 'text-muted');
+          stockParts.push(`<span class="${sc}">${escHtml(p.unit_3)}:${sv}</span>`);
+        }
+        const stockDisplayHtml = stockParts.length ? stockParts.join('<br>') : `<span class="text-muted">—</span>`;
+        tr.innerHTML = `
         <td class="fw-bold font-monospace">${escHtml(p.productID)}</td>
         <td><span class="badge bg-${catColor}">${escHtml(p.category)}</span>
           ${p.isLimited ? '<span class="badge bg-danger ms-1">限量</span>' : ''}
@@ -317,7 +340,7 @@
         <td class="fw-bold">${escHtml(nameDisplay)}</td>
         <td><span class="text-secondary" style="font-size:0.83rem;font-style:italic;">${escHtml((p.flavorDescription || '—').slice(0, 50))}${(p.flavorDescription || '').length > 50 ? '…' : ''}</span></td>
         <td>${specHtml || '<span class="text-muted">—</span>'}</td>
-        <td><span class="${p.stock <= 0 ? 'text-danger fw-bold' : 'text-success'}">${p.stock}</span></td>
+        <td style="font-size:0.82rem;line-height:1.7;">${stockDisplayHtml}</td>
         <td class="text-center">
           <div class="d-flex gap-1 justify-content-center">
             <button class="btn-action btn-action-edit" data-id="${escHtml(p.productID)}" title="編輯">
@@ -403,15 +426,29 @@
         fldPackageNotes.value = p.packageNotes || '';
       }
 
+      const getUnitFallback = (u, def) => {
+        if (!u) return '';
+        if (u.includes('半磅') || u.includes('耳掛') || u.includes('濾掛')) return '包';
+        if (u.includes('一磅') || u.includes('1磅')) return '袋';
+        if (u.includes('組')) return '組';
+        if (u.includes('個')) return '個';
+        return def || '件';
+      };
+
       fldUnit1.value  = p.unit_1  || '';
       fldPrice1.value = p.price_1 || '';
+      if (fldStock1) fldStock1.value = (p.stock_1 !== null && p.stock_1 !== undefined) ? p.stock_1 : '';
+      if (fldStockUnit1) fldStockUnit1.value = p.stock_unit_1 || p.stockunit_1 || p.StockUnit_1 || getUnitFallback(p.unit_1, '包');
       fldUnit2.value  = p.unit_2  || '';
       fldPrice2.value = p.price_2 || '';
+      if (fldStock2) fldStock2.value = (p.stock_2 !== null && p.stock_2 !== undefined) ? p.stock_2 : '';
+      if (fldStockUnit2) fldStockUnit2.value = p.stock_unit_2 || p.stockunit_2 || p.StockUnit_2 || (p.unit_2 ? getUnitFallback(p.unit_2, '袋') : '');
       fldUnit3.value  = p.unit_3  || '';
       fldPrice3.value = p.price_3 || '';
+      if (fldStock3) fldStock3.value = (p.stock_3 !== null && p.stock_3 !== undefined) ? p.stock_3 : '';
+      if (fldStockUnit3) fldStockUnit3.value = p.stock_unit_3 || p.stockunit_3 || p.StockUnit_3 || (p.unit_3 ? getUnitFallback(p.unit_3, '包') : '');
       fldOriginalPrice.value = p.originalPrice || '';
       fldSalePrice.value     = p.salePrice || '';
-      fldStock.value  = p.stock ?? 0;
       fldFlavor.value = p.flavorDescription || '';
       fldIsLimited.checked = !!p.isLimited;
 
@@ -553,13 +590,18 @@
       category,
       unit_1: fldUnit1.value.trim(),
       price_1: Number(fldPrice1.value) || null,
+      stock_1: fldStock1 && fldStock1.value !== '' ? Number(fldStock1.value) : null,
+      stock_unit_1: fldStockUnit1 ? fldStockUnit1.value.trim() || null : null,
       unit_2: fldUnit2.value.trim() || null,
       price_2: Number(fldPrice2.value) || null,
+      stock_2: fldStock2 && fldStock2.value !== '' ? Number(fldStock2.value) : null,
+      stock_unit_2: fldStockUnit2 ? fldStockUnit2.value.trim() || null : null,
       unit_3: fldUnit3.value.trim() || null,
       price_3: Number(fldPrice3.value) || null,
+      stock_3: fldStock3 && fldStock3.value !== '' ? Number(fldStock3.value) : null,
+      stock_unit_3: fldStockUnit3 ? fldStockUnit3.value.trim() || null : null,
       originalPrice: Number(fldOriginalPrice.value) || null,
       salePrice: Number(fldSalePrice.value) || null,
-      stock: Number(fldStock.value) || 0,
       flavorDescription: fldFlavor.value.trim() || null,
       isLimited: fldIsLimited.checked
     };

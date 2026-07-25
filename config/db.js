@@ -26,9 +26,9 @@ let mockProducts = [
     processMethod: '日曬',
     brand: null,
     packageNotes: null,
-    unit_1: '半磅', price_1: 380,
-    unit_2: '一磅', price_2: 700,
-    unit_3: '耳掛', price_3: 45,
+    unit_1: '半磅', price_1: 380, stock_1: 50, stock_unit_1: '包',
+    unit_2: '一磅', price_2: 700, stock_2: 25, stock_unit_2: '袋',
+    unit_3: '耳掛', price_3: 45,  stock_3: 100, stock_unit_3: '包',
     originalPrice: null,
     salePrice: null,
     flavorDescription: '藍莓、水蜜桃、茉莉花香、佛手柑與蜂蜜甜感，層次豐富明亮。',
@@ -44,9 +44,9 @@ let mockProducts = [
     processMethod: '水洗',
     brand: null,
     packageNotes: null,
-    unit_1: '半磅', price_1: 950,
-    unit_2: '一磅', price_2: 1800,
-    unit_3: '耳掛', price_3: 100,
+    unit_1: '半磅', price_1: 950,  stock_1: 25, stock_unit_1: '包',
+    unit_2: '一磅', price_2: 1800, stock_2: 12, stock_unit_2: '袋',
+    unit_3: '耳掛', price_3: 100,  stock_3: 50, stock_unit_3: '包',
     originalPrice: null,
     salePrice: null,
     flavorDescription: '經典茉莉花香、檸檬、柑橘、白葡萄、佛手柑氣息，明亮多汁的酸質。',
@@ -62,9 +62,9 @@ let mockProducts = [
     processMethod: '水洗',
     brand: null,
     packageNotes: null,
-    unit_1: '半磅', price_1: 320,
-    unit_2: '一磅', price_2: 600,
-    unit_3: '耳掛', price_3: 35,
+    unit_1: '半磅', price_1: 320, stock_1: 80, stock_unit_1: '包',
+    unit_2: '一磅', price_2: 600, stock_2: 40, stock_unit_2: '袋',
+    unit_3: '耳掛', price_3: 35,  stock_3: 200, stock_unit_3: '包',
     originalPrice: null,
     salePrice: null,
     flavorDescription: '榛果、焦糖甜感、可可風味、酸度圓潤低沉、餘韻悠長。',
@@ -78,9 +78,9 @@ let mockProducts = [
     origin: null, estate: null, name: null, processMethod: null,
     brand: '中烘焙',
     packageNotes: '10包/組，內含5種精品豆各2包',
-    unit_1: '每組', price_1: 185,
-    unit_2: null, price_2: null,
-    unit_3: null, price_3: null,
+    unit_1: '每組', price_1: 185, stock_1: 30, stock_unit_1: '組',
+    unit_2: null,   price_2: null, stock_2: null, stock_unit_2: null,
+    unit_3: null,   price_3: null, stock_3: null, stock_unit_3: null,
     originalPrice: null,
     salePrice: null,
     flavorDescription: '綜合烘焙，堅果醇厚、焦糖甜感，適合喜愛濃醇口感的您。',
@@ -98,9 +98,9 @@ let mockProducts = [
     origin: null, estate: null, name: null, processMethod: null,
     brand: '中淺焙',
     packageNotes: '10包/組，內含5種精品豆各2包',
-    unit_1: '每組', price_1: 195,
-    unit_2: null, price_2: null,
-    unit_3: null, price_3: null,
+    unit_1: '每組', price_1: 195, stock_1: 20, stock_unit_1: '組',
+    unit_2: null,   price_2: null, stock_2: null, stock_unit_2: null,
+    unit_3: null,   price_3: null, stock_3: null, stock_unit_3: null,
     originalPrice: null,
     salePrice: null,
     flavorDescription: '水果酸甜、優雅花香，適合喜愛清爽明亮口感的您。',
@@ -115,9 +115,9 @@ let mockProducts = [
     origin: null, estate: null, name: null, processMethod: null,
     brand: 'KAKAMA COFFEE',
     packageNotes: null,
-    unit_1: '個', price_1: 280,
-    unit_2: null, price_2: null,
-    unit_3: null, price_3: null,
+    unit_1: '個', price_1: 280, stock_1: 100, stock_unit_1: '個',
+    unit_2: null,  price_2: null, stock_2: null, stock_unit_2: null,
+    unit_3: null,  price_3: null, stock_3: null, stock_unit_3: null,
     originalPrice: 350,
     salePrice: 280,
     flavorDescription: 'KAKAMA COFFEE 自家品牌濾紙，專為手沖設計，配合V60使用效果最佳。',
@@ -190,7 +190,13 @@ async function initializeDB() {
         SalePrice         NUMERIC(10,0) NULL,
         FlavorDescription TEXT          NULL,
         Stock             INT           NOT NULL DEFAULT 0,
-        IsLimited         BOOLEAN       NOT NULL DEFAULT FALSE
+        IsLimited         BOOLEAN       NOT NULL DEFAULT FALSE,
+        Stock_1           INT           NULL,
+        StockUnit_1       VARCHAR(20)   NULL,
+        Stock_2           INT           NULL,
+        StockUnit_2       VARCHAR(20)   NULL,
+        Stock_3           INT           NULL,
+        StockUnit_3       VARCHAR(20)   NULL
       );
 
       CREATE TABLE IF NOT EXISTS DripBagRecipes (
@@ -231,18 +237,44 @@ async function initializeDB() {
     `;
     await pool.query(createTableQuery);
 
+    // 安全遷移：為舊有資料表補上新欄位 (ADD COLUMN IF NOT EXISTS)
+    const migrateQuery = `
+      ALTER TABLE Products ADD COLUMN IF NOT EXISTS Stock_1     INT         NULL;
+      ALTER TABLE Products ADD COLUMN IF NOT EXISTS StockUnit_1 VARCHAR(20) NULL;
+      ALTER TABLE Products ADD COLUMN IF NOT EXISTS Stock_2     INT         NULL;
+      ALTER TABLE Products ADD COLUMN IF NOT EXISTS StockUnit_2 VARCHAR(20) NULL;
+      ALTER TABLE Products ADD COLUMN IF NOT EXISTS Stock_3     INT         NULL;
+      ALTER TABLE Products ADD COLUMN IF NOT EXISTS StockUnit_3 VARCHAR(20) NULL;
+
+      -- 為舊有資料或預設商品的 NULL 庫存單位與數量進行回填
+      UPDATE Products SET Stock_1 = COALESCE(Stock_1, 50), StockUnit_1 = '包' WHERE ProductID = 'CO135' AND StockUnit_1 IS NULL;
+      UPDATE Products SET Stock_2 = COALESCE(Stock_2, 25), StockUnit_2 = '袋' WHERE ProductID = 'CO135' AND StockUnit_2 IS NULL;
+      UPDATE Products SET Stock_3 = COALESCE(Stock_3, 100), StockUnit_3 = '包' WHERE ProductID = 'CO135' AND StockUnit_3 IS NULL;
+      UPDATE Products SET Stock_1 = COALESCE(Stock_1, 25), StockUnit_1 = '包' WHERE ProductID = 'CO246' AND StockUnit_1 IS NULL;
+      UPDATE Products SET Stock_2 = COALESCE(Stock_2, 12), StockUnit_2 = '袋' WHERE ProductID = 'CO246' AND StockUnit_2 IS NULL;
+      UPDATE Products SET Stock_3 = COALESCE(Stock_3, 50), StockUnit_3 = '包' WHERE ProductID = 'CO246' AND StockUnit_3 IS NULL;
+      UPDATE Products SET Stock_1 = COALESCE(Stock_1, 80), StockUnit_1 = '包' WHERE ProductID = 'CO379' AND StockUnit_1 IS NULL;
+      UPDATE Products SET Stock_2 = COALESCE(Stock_2, 40), StockUnit_2 = '袋' WHERE ProductID = 'CO379' AND StockUnit_2 IS NULL;
+      UPDATE Products SET Stock_3 = COALESCE(Stock_3, 200), StockUnit_3 = '包' WHERE ProductID = 'CO379' AND StockUnit_3 IS NULL;
+      UPDATE Products SET Stock_1 = COALESCE(Stock_1, 30), StockUnit_1 = '組' WHERE ProductID = 'DP001' AND StockUnit_1 IS NULL;
+      UPDATE Products SET Stock_1 = COALESCE(Stock_1, 20), StockUnit_1 = '組' WHERE ProductID = 'DP002' AND StockUnit_1 IS NULL;
+      UPDATE Products SET Stock_1 = COALESCE(Stock_1, 100), StockUnit_1 = '個' WHERE ProductID = 'ACC001' AND StockUnit_1 IS NULL;
+    `;
+    await pool.query(migrateQuery);
+    console.log('🔧 [Database] 規格庫存欄位遷移完成（Stock_1/2/3, StockUnit_1/2/3）。');
+
     // 寫入預設測試資料 (若不存在)
     // 寫入預設測試資料 (若不存在)
     const initDataQuery = `
       -- 1. 寫入預設商品 (咖啡豆、掛耳包組、周邊)
-      INSERT INTO Products (ProductID, Category, Origin, Estate, Name, ProcessMethod, Brand, PackageNotes, Unit_1, Price_1, Unit_2, Price_2, Unit_3, Price_3, OriginalPrice, SalePrice, FlavorDescription, Stock, IsLimited)
+      INSERT INTO Products (ProductID, Category, Origin, Estate, Name, ProcessMethod, Brand, PackageNotes, Unit_1, Price_1, Stock_1, StockUnit_1, Unit_2, Price_2, Stock_2, StockUnit_2, Unit_3, Price_3, Stock_3, StockUnit_3, OriginalPrice, SalePrice, FlavorDescription, Stock, IsLimited)
       VALUES 
-      ('CO135', '咖啡豆', '衣索比亞', '耶加雪菲 歌迪貝 艾瑞莎', NULL, '日曬', NULL, NULL, '半磅', 380, '一磅', 700, '耳掛', 45, NULL, NULL, '藍莓、水蜜桃、茉莉花香、佛手柑與蜂蜜甜感，層次豐富明亮。', 50, FALSE),
-      ('CO246', '咖啡豆', '巴拿馬', '波奎特 翡翠莊園 藍標葛夏', NULL, '水洗', NULL, NULL, '半磅', 950, '一磅', 1800, '耳掛', 100, NULL, NULL, '經典茉莉花香、檸檬、柑橘、白葡萄、佛手柑氣息，明亮多汁的酸質。', 25, FALSE),
-      ('CO379', '咖啡豆', '哥倫比亞', '聖芭芭拉莊園 模範生', NULL, '水洗', NULL, NULL, '半磅', 320, '一磅', 600, '耳掛', 35, NULL, NULL, '榛果、焦糖甜感、可可風味、酸度圓潤低沉、餘韻悠長。', 80, FALSE),
-      ('DP001', '掛耳包組', NULL, NULL, NULL, NULL, '中烘焙', '10包/組，內含5種精品豆各2包', '每組', 185, NULL, NULL, NULL, NULL, NULL, NULL, '綜合烘焙，堅果醇厚、焦糖甜感，適合喜愛濃醇口感的您。', 30, TRUE),
-      ('DP002', '掛耳包組', NULL, NULL, NULL, NULL, '中淺焙', '10包/組，內含5種精品豆各2包', '每組', 195, NULL, NULL, NULL, NULL, NULL, NULL, '水果酸甜、優雅花香，適合喜愛清爽明亮口感的您。', 20, TRUE),
-      ('ACC001', '周邊產品', NULL, NULL, NULL, NULL, 'KAKAMA COFFEE', NULL, '個', 280, NULL, NULL, NULL, NULL, 350, 280, 'KAKAMA COFFEE 自家品牌濾紙，專為手沖設計，配合V60使用效果最佳。', 100, FALSE)
+      ('CO135', '咖啡豆', '衣索比亞', '耶加雪菲 歌迪貝 艾瑞莎', NULL, '日曬', NULL, NULL, '半磅', 380, 50, '包', '一磅', 700, 25, '袋', '耳掛', 45, 100, '包', NULL, NULL, '藍莓、水蜜桃、茉莉花香、佛手柑與蜂蜜甜感，層次豐富明亮。', 50, FALSE),
+      ('CO246', '咖啡豆', '巴拿馬', '波奎特 翡翠莊園 藍標葛夏', NULL, '水洗', NULL, NULL, '半磅', 950, 25, '包', '一磅', 1800, 12, '袋', '耳掛', 100, 50, '包', NULL, NULL, '經典茉莉花香、檸檬、柑橘、白葡萄、佛手柑氣息，明亮多汁的酸質。', 25, FALSE),
+      ('CO379', '咖啡豆', '哥倫比亞', '聖芭芭拉莊園 模範生', NULL, '水洗', NULL, NULL, '半磅', 320, 80, '包', '一磅', 600, 40, '袋', '耳掛', 35, 200, '包', NULL, NULL, '榛果、焦糖甜感、可可風味、酸度圓潤低沉、餘韻悠長。', 80, FALSE),
+      ('DP001', '掛耳包組', NULL, NULL, NULL, NULL, '中烘焙', '10包/組，內含5種精品豆各2包', '每組', 185, 30, '組', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '綜合烘焙，堅果醇厚、焦糖甜感，適合喜愛濃醇口感的您。', 30, TRUE),
+      ('DP002', '掛耳包組', NULL, NULL, NULL, NULL, '中淺焙', '10包/組，內含5種精品豆各2包', '每組', 195, 20, '組', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '水果酸甜、優雅花香，適合喜愛清爽明亮口感的您。', 20, TRUE),
+      ('ACC001', '周邊產品', NULL, NULL, NULL, NULL, 'KAKAMA COFFEE', NULL, '個', 280, 100, '個', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 350, 280, 'KAKAMA COFFEE 自家品牌濾紙，專為手沖設計，配合V60使用效果最佳。', 100, FALSE)
       ON CONFLICT (ProductID) DO NOTHING;
 
       -- 2. 寫入掛耳包配方
@@ -289,6 +321,7 @@ async function initializeDB() {
 
 // ─── helper: 將 Postgres recordset 欄位名轉為 camelCase ───
 function mapRecord(r) {
+  const toN = v => (v !== null && v !== undefined) ? Number(v) : null;
   return {
     productID: r.productid || r.ProductID,
     category: r.category || r.Category,
@@ -298,13 +331,22 @@ function mapRecord(r) {
     processMethod: r.processmethod || r.ProcessMethod,
     brand: r.brand || r.Brand,
     packageNotes: r.packagenotes || r.PackageNotes,
-    unit_1: r.unit_1 || r.Unit_1, price_1: (r.price_1 ?? r.Price_1) !== null ? Number(r.price_1 ?? r.Price_1) : null,
-    unit_2: r.unit_2 || r.Unit_2, price_2: (r.price_2 ?? r.Price_2) !== null ? Number(r.price_2 ?? r.Price_2) : null,
-    unit_3: r.unit_3 || r.Unit_3, price_3: (r.price_3 ?? r.Price_3) !== null ? Number(r.price_3 ?? r.Price_3) : null,
-    originalPrice: (r.originalprice ?? r.OriginalPrice) !== null ? Number(r.originalprice ?? r.OriginalPrice) : null,
-    salePrice: (r.saleprice ?? r.SalePrice) !== null ? Number(r.saleprice ?? r.SalePrice) : null,
+    unit_1: r.unit_1 || r.Unit_1,
+    price_1: toN(r.price_1 ?? r.Price_1),
+    stock_1: (r.stock_1 ?? r.Stock_1) !== null && (r.stock_1 ?? r.Stock_1) !== undefined ? Number(r.stock_1 ?? r.Stock_1) : null,
+    stock_unit_1: r.stock_unit_1 || r.stockunit_1 || r.StockUnit_1 || null,
+    unit_2: r.unit_2 || r.Unit_2,
+    price_2: toN(r.price_2 ?? r.Price_2),
+    stock_2: (r.stock_2 ?? r.Stock_2) !== null && (r.stock_2 ?? r.Stock_2) !== undefined ? Number(r.stock_2 ?? r.Stock_2) : null,
+    stock_unit_2: r.stock_unit_2 || r.stockunit_2 || r.StockUnit_2 || null,
+    unit_3: r.unit_3 || r.Unit_3,
+    price_3: toN(r.price_3 ?? r.Price_3),
+    stock_3: (r.stock_3 ?? r.Stock_3) !== null && (r.stock_3 ?? r.Stock_3) !== undefined ? Number(r.stock_3 ?? r.Stock_3) : null,
+    stock_unit_3: r.stock_unit_3 || r.stockunit_3 || r.StockUnit_3 || null,
+    originalPrice: toN(r.originalprice ?? r.OriginalPrice),
+    salePrice: toN(r.saleprice ?? r.SalePrice),
     flavorDescription: r.flavordescription || r.FlavorDescription,
-    stock: r.stock ?? r.Stock,
+    stock: r.stock ?? r.Stock ?? 0,
     isLimited: Boolean(r.islimited ?? r.IsLimited)
   };
 }
@@ -433,29 +475,36 @@ async function addProduct(product) {
         INSERT INTO Products
         (ProductID, Category, Origin, Estate, Name, ProcessMethod, Brand, PackageNotes,
          Unit_1, Price_1, Unit_2, Price_2, Unit_3, Price_3,
-         OriginalPrice, SalePrice, FlavorDescription, Stock, IsLimited)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+         OriginalPrice, SalePrice, FlavorDescription, Stock, IsLimited,
+         Stock_1, StockUnit_1, Stock_2, StockUnit_2, Stock_3, StockUnit_3)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)
       `;
       const values = [
         product.productID,
         product.category,
-        product.origin || null,
-        product.estate || null,
-        product.name || null,
+        product.origin   || null,
+        product.estate   || null,
+        product.name     || null,
         product.processMethod || null,
-        product.brand || null,
+        product.brand    || null,
         product.packageNotes || null,
-        product.unit_1 || null,
-        product.price_1 || null,
-        product.unit_2 || null,
-        product.price_2 || null,
-        product.unit_3 || null,
-        product.price_3 || null,
-        product.originalPrice || null,
-        product.salePrice || null,
+        product.unit_1   || null,
+        product.price_1  ?? null,
+        product.unit_2   || null,
+        product.price_2  ?? null,
+        product.unit_3   || null,
+        product.price_3  ?? null,
+        product.originalPrice ?? null,
+        product.salePrice     ?? null,
         product.flavorDescription || null,
         product.stock ?? 0,
-        Boolean(product.isLimited)
+        Boolean(product.isLimited),
+        product.stock_1    ?? null,
+        product.stock_unit_1 || null,
+        product.stock_2    ?? null,
+        product.stock_unit_2 || null,
+        product.stock_3    ?? null,
+        product.stock_unit_3 || null
       ];
       await pool.query(query, values);
 
@@ -487,28 +536,37 @@ async function updateProduct(productID, updated) {
           Unit_1=$8, Price_1=$9, Unit_2=$10, Price_2=$11,
           Unit_3=$12, Price_3=$13,
           OriginalPrice=$14, SalePrice=$15,
-          FlavorDescription=$16, Stock=$17, IsLimited=$18
-        WHERE ProductID=$19
+          FlavorDescription=$16, Stock=$17, IsLimited=$18,
+          Stock_1=$19, StockUnit_1=$20,
+          Stock_2=$21, StockUnit_2=$22,
+          Stock_3=$23, StockUnit_3=$24
+        WHERE ProductID=$25
       `;
       const values = [
         updated.category,
-        updated.origin || null,
-        updated.estate || null,
-        updated.name || null,
+        updated.origin   || null,
+        updated.estate   || null,
+        updated.name     || null,
         updated.processMethod || null,
-        updated.brand || null,
+        updated.brand    || null,
         updated.packageNotes || null,
-        updated.unit_1 || null,
-        updated.price_1 || null,
-        updated.unit_2 || null,
-        updated.price_2 || null,
-        updated.unit_3 || null,
-        updated.price_3 || null,
-        updated.originalPrice || null,
-        updated.salePrice || null,
+        updated.unit_1   || null,
+        updated.price_1  ?? null,
+        updated.unit_2   || null,
+        updated.price_2  ?? null,
+        updated.unit_3   || null,
+        updated.price_3  ?? null,
+        updated.originalPrice ?? null,
+        updated.salePrice     ?? null,
         updated.flavorDescription || null,
         updated.stock ?? 0,
         Boolean(updated.isLimited),
+        updated.stock_1    ?? null,
+        updated.stock_unit_1 || null,
+        updated.stock_2    ?? null,
+        updated.stock_unit_2 || null,
+        updated.stock_3    ?? null,
+        updated.stock_unit_3 || null,
         productID
       ];
       const result = await pool.query(query, values);

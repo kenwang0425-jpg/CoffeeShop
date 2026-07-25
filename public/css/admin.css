@@ -948,96 +948,225 @@ body {
 }
 
 /* ══════════════════════════════════════════
+   @page — A4 版面設定
+══════════════════════════════════════════ */
+@page {
+  size: A4 portrait;
+  margin: 15mm;
+}
+
+/* ══════════════════════════════════════════
    @media print — 列印備料單
    隱藏後台所有裝飾，輸出黑白乾淨清單
 ══════════════════════════════════════════ */
 @media print {
-  /* 隱藏一切不屬於備料單的內容 */
-  body > *:not(.modal) { display: none !important; }
-  .modal { display: block !important; position: static !important; }
-  .modal-backdrop { display: none !important; }
-  .modal-dialog {
-    max-width: 100% !important;
-    margin: 0 !important;
-    box-shadow: none !important;
-  }
-  .modal-content,
-  .modal-content-custom {
-    background: #fff !important;
-    color: #111 !important;
-    border: none !important;
-    box-shadow: none !important;
-  }
 
-  /* 隱藏 Modal 頁眉、頁腳按鈕、loading */
+  /* ── 1. 隱藏所有後台 UI 元素 ── */
+  body > *                          { display: none !important; }
+  .modal-backdrop,
+  .sidebar,
+  .main-header,
+  .main-content > *:not(#roast-modal),
   .modal-header,
   .modal-footer,
-  .roast-loading,
-  #roast-loading,
   .btn-close,
-  .btn-close-white-custom { display: none !important; }
+  .btn-close-white-custom,
+  #btn-print-roast,
+  .roast-loading,
+  #roast-loading                    { display: none !important; }
 
-  /* 備料單本體 */
-  .roast-sheet { padding: 0 !important; }
-
-  /* 列印標題 */
-  .roast-print-title {
+  /* ── 2. 讓目標 Modal 可見並重置排版 ── */
+  #roast-modal {
     display: block !important;
-    font-size: 18pt;
-    font-weight: 700;
-    margin-bottom: 6pt;
-    color: #000;
+    position: static !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+    overflow: visible !important;
   }
 
-  /* 摘要列 */
+  .modal-dialog {
+    max-width: 100% !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    transform: none !important;
+  }
+
+  .modal-content,
+  .modal-content-custom {
+    position: static !important;
+    background: #ffffff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    color: #000 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  .modal-body {
+    padding: 0 !important;
+    overflow: visible !important;
+    max-height: none !important;
+  }
+
+  /* ── 3. 備料單本體樣式 ── */
+  .roast-sheet {
+    padding: 0 !important;
+    background: #fff !important;
+  }
+
+  /* ── 4. 列印專用標題（螢幕隱藏，列印顯示）── */
+  .roast-print-title {
+    display: block !important;
+    font-size: 18pt !important;
+    font-weight: 700 !important;
+    color: #000 !important;
+    margin-bottom: 4pt !important;
+    /* 關鍵：避免標題單獨孤立在上一頁 */
+    break-after: avoid !important;
+    page-break-after: avoid !important;
+  }
+
+  /* ── 5. 摘要列 ── */
   .roast-meta {
     color: #444 !important;
-    border-bottom: 1px solid #ccc !important;
-    padding-bottom: 6pt !important;
-    margin-bottom: 10pt !important;
+    border-bottom: 1px solid #aaa !important;
+    padding-bottom: 5pt !important;
+    margin-bottom: 8pt !important;
     font-size: 9pt !important;
+    background: transparent !important;
+    break-after: avoid !important;
+    page-break-after: avoid !important;
   }
   .roast-meta strong { color: #000 !important; }
 
-  /* 分類標題 */
-  .roast-section-title {
-    color: #000 !important;
-    border-bottom: 2px solid #555 !important;
-    font-size: 11pt !important;
-    margin-top: 12pt !important;
-    margin-bottom: 6pt !important;
+  /* ── 6. 分類區塊：防斷頁 ── */
+  .roast-section {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    margin-bottom: 12pt !important;
   }
 
-  /* 表格 */
-  .roast-table { font-size: 10pt !important; }
-  .roast-table th {
-    background: #eee !important;
-    color: #333 !important;
-    border-bottom: 1px solid #999 !important;
+  /* ── 7. 分類標題：確保與緊接的表格同頁 ── */
+  .roast-section-title {
+    display: block !important;
+    color: #000 !important;
+    border-bottom: 2px solid #444 !important;
+    background: transparent !important;
+    font-size: 11pt !important;
+    font-weight: 700 !important;
+    margin-top: 10pt !important;
+    margin-bottom: 5pt !important;
+    padding-bottom: 3pt !important;
+    /* 關鍵：標題不自己孤立在上一頁底部 */
+    break-after: avoid !important;
+    page-break-after: avoid !important;
   }
+
+  /* ── 8. 表格樣式 ── */
+  .roast-table {
+    font-size: 9.5pt !important;
+    width: 100% !important;
+    border-collapse: collapse !important;
+    background: transparent !important;
+  }
+
+  .roast-table thead {
+    /* 若表格跨頁，重複列印表頭 */
+    display: table-header-group;
+  }
+
+  .roast-table th {
+    background: #eeeeee !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    color: #222 !important;
+    font-weight: 700 !important;
+    font-size: 8pt !important;
+    border: 1px solid #999 !important;
+    padding: 4pt 6pt !important;
+    text-align: left !important;
+    /* 表頭不在分頁處截斷 */
+    break-after: avoid !important;
+    page-break-after: avoid !important;
+  }
+
   .roast-table td {
     color: #111 !important;
-    border-bottom: 1px solid #ddd !important;
+    border: 1px solid #ccc !important;
+    padding: 4pt 6pt !important;
+    background: transparent !important;
+    vertical-align: top !important;
   }
-  .roast-table td.num { color: #000 !important; }
-  .roast-table tfoot tr td {
-    background: #f5f5f5 !important;
+
+  /* 關鍵：每一列不在中間被切斷 */
+  .roast-table tr {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  .roast-table td.num {
     color: #000 !important;
-    border-top: 2px solid #888 !important;
+    font-weight: 700 !important;
+    text-align: right !important;
   }
 
-  /* 備考 */
+  .roast-table tr:last-child td {
+    border-bottom: 1px solid #ccc !important;
+  }
+
+  /* 小計列 */
+  .roast-table tfoot tr td {
+    background: #f0f0f0 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    color: #000 !important;
+    font-weight: 700 !important;
+    border-top: 2px solid #666 !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* ── 9. 磅數備考欄 ── */
   .roast-note {
-    color: #555 !important;
-    border-left-color: #999 !important;
-    background: #f9f9f9 !important;
-    font-size: 8pt !important;
-    page-break-inside: avoid;
+    color: #444 !important;
+    border-left: 3px solid #888 !important;
+    background: #f7f7f7 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    font-size: 7.5pt !important;
+    margin-top: 6pt !important;
+    padding: 4pt 6pt !important;
+    line-height: 1.6 !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
   }
-  .roast-empty-hint { color: #888 !important; border-color: #ccc !important; }
 
-  /* 分頁控制 */
-  .roast-section { page-break-inside: avoid; }
+  /* ── 10. 空資料提示 ── */
+  .roast-empty-hint {
+    color: #666 !important;
+    border-color: #bbb !important;
+    background: transparent !important;
+  }
+
+  /* ── 11. 全域文字、連結色覆蓋 ── */
+  * {
+    color: inherit !important;
+    text-shadow: none !important;
+    box-shadow: none !important;
+  }
+
+  a, a:visited { color: #000 !important; text-decoration: none !important; }
 }
 
 /* 列印標題（螢幕不顯示）*/

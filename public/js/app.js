@@ -300,7 +300,7 @@
     showCatalogLoading(false);
     let list = allProducts;
 
-    // 前端即時篩選（只對咖啡豆有效）
+    // 前端即時簾選（只對咖啡豆有效）
     if (activeCategory === '咖啡豆') {
       if (activeOrigin !== 'all') {
         list = list.filter(p => p.origin === activeOrigin);
@@ -335,16 +335,37 @@
   }
 
   function buildProductCard(p, idx) {
-    const isOutOfStock = p.stock <= 0;
-    const isLimited    = !!p.isLimited;
-    const isDripBag    = p.category === '掛耳包組';
+    const isDripBag = p.category === '掛耳包組';
+    const isLimited = !!p.isLimited;
+
+    // ── 規格陣列（包含庫存）
+    const specs = [];
+    if (p.unit_1 && p.price_1) specs.push({
+      unit: p.unit_1, price: p.price_1,
+      stock: (p.stock_1 !== null && p.stock_1 !== undefined) ? p.stock_1 : null,
+      stockUnit: p.stock_unit_1
+    });
+    if (p.unit_2 && p.price_2) specs.push({
+      unit: p.unit_2, price: p.price_2,
+      stock: (p.stock_2 !== null && p.stock_2 !== undefined) ? p.stock_2 : null,
+      stockUnit: p.stock_unit_2
+    });
+    if (p.unit_3 && p.price_3) specs.push({
+      unit: p.unit_3, price: p.price_3,
+      stock: (p.stock_3 !== null && p.stock_3 !== undefined) ? p.stock_3 : null,
+      stockUnit: p.stock_unit_3
+    });
+
+    // 整體售完：所有規格庫存均明確為 0（null = 無限制）
+    const isOutOfStock = specs.length > 0
+      ? specs.every(s => typeof s.stock === 'number' && s.stock <= 0)
+      : (p.stock !== null && p.stock !== undefined && Number(p.stock) <= 0);
 
     // ── 卡片主標題
     let displayTitle = '';
     if (p.category === '咖啡豆') {
       displayTitle = [p.origin, p.estate, p.processMethod].filter(Boolean).join(' ');
     } else if (isDripBag) {
-      // 例：「中烘焙 綜合掛耳包」
       displayTitle = p.brand ? p.brand : '掛耳包組';
     } else {
       displayTitle = p.name || p.brand || '周邊產品';
@@ -364,10 +385,9 @@
     const originHtml = (!isDripBag && p.origin)
       ? `<p class="sf-card-origin">${escHtml(p.origin)}</p>` : '';
 
-    // ── 掛耳包：副標說明（取 packageNotes，移除包數相關文字）
+    // ── 掛耳包：副標說明
     let dripSubtitleHtml = '';
     if (isDripBag) {
-      // 去掉「各N包」「(N包)」「N包/組」之類的字樣
       const cleanNotes = (p.packageNotes || '')
         .replace(/各?\d+包\/組/g, '')
         .replace(/各?\d+包/g, '')
@@ -378,7 +398,7 @@
       }
     }
 
-    // ── 掛耳包：職人風味清單（☕ SubID 豆名 — 風味前20字）
+    // ── 掛耳包：配方風味清單
     let recipesHtml = '';
     if (isDripBag && p.recipes && p.recipes.length > 0) {
       const items = p.recipes.map(r => {
@@ -407,40 +427,40 @@
         </div>`;
     }
 
-    // ── 一般商品風味（掛耳包不使用 flavorDescription）
+    // ── 一般商品風味
     const flavorHtml = (!isDripBag && p.flavorDescription)
       ? `<p class="sf-card-flavor">${escHtml(p.flavorDescription)}</p>`
       : '';
 
-    // ── 庫存
-    const stockHtml = isOutOfStock
-      ? `<p class="sf-card-stock sf-stock-none">補貨中</p>`
-      : `<p class="sf-card-stock sf-stock-ok">庫存 ${p.stock} 件</p>`;
-
-    // ── 規格價格
-    const specs = [];
-    if (p.unit_1 && p.price_1) specs.push({ unit: p.unit_1, price: p.price_1 });
-    if (p.unit_2 && p.price_2) specs.push({ unit: p.unit_2, price: p.price_2 });
-    if (p.unit_3 && p.price_3) specs.push({ unit: p.unit_3, price: p.price_3 });
-
+    // ── 規格價格 + 選購按鈕（規格獨立庫存小標示）
     const priceRowsHtml = specs.map(s => {
+      const specOOS = typeof s.stock === 'number' && s.stock <= 0;
       const priceDisplay = p.salePrice && specs.length === 1
         ? `<span class="sf-price-original">NT$ ${fmtN(p.originalPrice)}</span>
            <span class="sf-price-value sf-price-sale">NT$ ${fmtN(p.salePrice)}</span>`
         : `<span class="sf-price-value">NT$ ${fmtN(s.price)}</span>`;
 
+      const stockLabel = specOOS
+        ? `<span class="sf-spec-stock sf-spec-oos">已售完</span>`
+        : (typeof s.stock === 'number'
+            ? `<span class="sf-spec-stock sf-spec-ok">庫存 ${s.stock}${escHtml(s.stockUnit || '')}</span>`
+            : '');
+
       return `
         <div class="sf-price-row">
-          <span class="sf-price-spec">${escHtml(s.unit)}</span>
+          <div class="sf-price-spec-col">
+            <span class="sf-price-spec">${escHtml(s.unit)}</span>
+            ${stockLabel}
+          </div>
           <div style="display:flex;align-items:center;gap:0.5rem;">
             ${priceDisplay}
-            <button class="sf-btn-add-to-cart"
+            <button class="sf-btn-add-to-cart${specOOS ? ' sf-btn-soldout' : ''}"
               data-id="${escHtml(p.productID)}"
               data-name="${escHtml(displayTitle)}"
               data-size="${escHtml(s.unit)}"
               data-price="${s.price}"
-              ${isOutOfStock ? 'disabled' : ''}>
-              + 選購
+              ${specOOS ? 'disabled' : ''}>
+              ${specOOS ? '已售完' : '+ 選購'}
             </button>
           </div>
         </div>`;
@@ -460,7 +480,6 @@
         ${dripSubtitleHtml}
         ${flavorHtml}
         ${recipesHtml}
-        ${stockHtml}
       </div>
       <div class="sf-card-price-box">
         ${priceRowsHtml}

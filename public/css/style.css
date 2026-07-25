@@ -1482,6 +1482,38 @@ body:not(.sf-body) {
   cursor: not-allowed;
 }
 
+/* 規格售完按鈕 */
+.sf-btn-add-to-cart.sf-btn-soldout {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  font-size: 0.72rem;
+}
+
+/* 規格+庫存標籤的縱向排列 */
+.sf-price-spec-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+/* 庫存小標示 */
+.sf-spec-stock {
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.sf-spec-oos {
+  color: #f87171;
+}
+
+.sf-spec-ok {
+  color: #6ee7b7;
+  opacity: 0.8;
+}
+
+
 /* 售完遮罩 */
 .sf-product-card.out-of-stock {
   opacity: 0.55;

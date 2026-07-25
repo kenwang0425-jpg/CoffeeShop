@@ -64,11 +64,19 @@ function validateProductPayload(body, isEdit = false) {
     }
   }
 
-  // 庫存
-  if (stock !== undefined && stock !== null && stock !== '') {
-    const n = Number(stock);
-    if (isNaN(n) || !Number.isInteger(n) || n < 0) {
-      errors.push('庫存必須為大於或等於 0 的整數。');
+  // 規格庫存（各规格若有填寫則必須為整數 >= 0）
+  const stockFields = [
+    { key: 'stock_1', label: '規格一庫存' },
+    { key: 'stock_2', label: '規格二庫存' },
+    { key: 'stock_3', label: '規格三庫存' }
+  ];
+  for (const { key, label } of stockFields) {
+    const v = body[key];
+    if (v !== undefined && v !== null && v !== '') {
+      const n = Number(v);
+      if (isNaN(n) || !Number.isInteger(n) || n < 0) {
+        errors.push(`「${label}」必須為大於等於 0 的整數。`);
+      }
     }
   }
 
@@ -106,8 +114,13 @@ function buildProductObject(body, productID) {
   const toNum   = v => (v !== undefined && v !== null && v !== '') ? Number(v) : null;
   const toStr   = v => (v !== undefined && v !== null && v !== '') ? String(v).trim() : null;
   const toBool  = v => v === true || v === 'true' || v === 1 || v === '1';
+  const toStockInt = v => {
+    if (v === undefined || v === null || v === '') return null;
+    const n = Number(v);
+    return isNaN(n) ? null : Math.max(0, Math.floor(n));
+  };
 
-  return {
+  const obj = {
     productID:         productID || String(body.productID).trim(),
     category:          body.category,
     origin:            toStr(body.origin),
@@ -117,18 +130,26 @@ function buildProductObject(body, productID) {
     brand:             toStr(body.brand),
     packageNotes:      toStr(body.packageNotes),
     unit_1:            toStr(body.unit_1),  price_1: toNum(body.price_1),
+    stock_1:           toStockInt(body.stock_1),
+    stock_unit_1:      toStr(body.stock_unit_1),
     unit_2:            toStr(body.unit_2),  price_2: toNum(body.price_2),
+    stock_2:           toStockInt(body.stock_2),
+    stock_unit_2:      toStr(body.stock_unit_2),
     unit_3:            toStr(body.unit_3),  price_3: toNum(body.price_3),
+    stock_3:           toStockInt(body.stock_3),
+    stock_unit_3:      toStr(body.stock_unit_3),
     originalPrice:     toNum(body.originalPrice),
     salePrice:         toNum(body.salePrice),
     flavorDescription: toStr(body.flavorDescription),
-    stock:             body.stock !== undefined && body.stock !== '' ? Number(body.stock) : 0,
+    // 全域 stock 保留（從規格一庫存派生，骗走 fallback）
+    stock:             toStockInt(body.stock_1) ?? 0,
     isLimited:         toBool(body.isLimited),
     recipes:           Array.isArray(body.recipes) ? body.recipes.map(r => ({
                          subProductID: toStr(r.subProductID),
                          quantity: toNum(r.quantity)
                        })) : []
   };
+  return obj;
 }
 
 // GET /api/products

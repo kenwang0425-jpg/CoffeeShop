@@ -354,57 +354,96 @@
               <div class="invalid-feedback-custom" id="recipe-duplicate-feedback">配方中不可選擇重複的咖啡豆。</div>
             </div>
 
-            <!-- ── 多規格價格 (共用) ── -->
+            <!-- ── 多規格價格 & 庫存 (共用) ── -->
             <hr class="border-secondary my-3">
-            <p class="text-info fs-8 mb-2 fw-bold text-uppercase tracking-wider"><i class="bi bi-cash-stack me-1"></i>規格
-              & 價格</p>
+            <p class="text-info fs-8 mb-2 fw-bold text-uppercase tracking-wider">
+              <i class="bi bi-cash-stack me-1"></i>規格 &amp; 價格 &amp; <span class="text-warning">庫存</span>
+            </p>
+            <!-- 表頭 -->
             <div class="row g-2 mb-1 align-items-center">
-              <div class="col-4"><small class="text-secondary">規格名稱</small></div>
-              <div class="col-4"><small class="text-secondary">售價 (NT$)</small></div>
-              <div class="col-4"></div>
+              <div class="col-3"><small class="text-secondary">規格名稱</small></div>
+              <div class="col-2"><small class="text-secondary">售價 (NT$)</small></div>
+              <div class="col-2"><small class="text-warning">庫存數量</small></div>
+              <div class="col-2"><small class="text-warning">庫存單位</small></div>
+              <div class="col-3"></div>
             </div>
             <!-- 規格 1 -->
-            <div class="row g-2 mb-2 align-items-center">
-              <div class="col-4">
-                <input type="text" class="form-control form-control-custom" id="product-unit-1" placeholder="如: 半磅、每組"
-                  required>
+            <div class="row g-2 mb-2 align-items-start">
+              <div class="col-3">
+                <input type="text" class="form-control form-control-custom" id="product-unit-1"
+                  placeholder="如: 半磅、每組" required>
                 <div class="invalid-feedback-custom" id="product-unit-1-feedback">規格一名稱為必填。</div>
               </div>
-              <div class="col-4">
-                <input type="number" class="form-control form-control-custom" id="product-price-1" placeholder="必填，> 0"
-                  min="1" required>
+              <div class="col-2">
+                <input type="number" class="form-control form-control-custom" id="product-price-1"
+                  placeholder="必填 > 0" min="1" required>
                 <div class="invalid-feedback-custom" id="product-price-1-feedback">價格必須大於 0。</div>
               </div>
-              <div class="col-4"><span class="badge bg-danger fs-9">必填規格</span></div>
+              <div class="col-2">
+                <input type="number" class="form-control form-control-custom" id="product-stock-1"
+                  placeholder="如: 50" min="0">
+                <div class="invalid-feedback-custom" id="product-stock-1-feedback">庫存必須 ≥ 0。</div>
+              </div>
+              <div class="col-2">
+                <input type="text" class="form-control form-control-custom" id="product-stock-unit-1"
+                  placeholder="包/袋/個">
+              </div>
+              <div class="col-3 d-flex align-items-center pt-1">
+                <span class="badge bg-danger" style="font-size:0.72rem;">必填規格</span>
+              </div>
             </div>
             <!-- 規格 2 -->
-            <div class="row g-2 mb-2 align-items-center">
-              <div class="col-4">
-                <input type="text" class="form-control form-control-custom" id="product-unit-2" placeholder="如: 一磅（選填）">
+            <div class="row g-2 mb-2 align-items-start">
+              <div class="col-3">
+                <input type="text" class="form-control form-control-custom" id="product-unit-2"
+                  placeholder="如: 一磅（選填）">
               </div>
-              <div class="col-4">
-                <input type="number" class="form-control form-control-custom" id="product-price-2" placeholder="選填，> 0"
-                  min="1">
+              <div class="col-2">
+                <input type="number" class="form-control form-control-custom" id="product-price-2"
+                  placeholder="選填 > 0" min="1">
                 <div class="invalid-feedback-custom" id="product-price-2-feedback">價格必須大於 0。</div>
               </div>
-              <div class="col-4"><span class="badge bg-secondary fs-9">選填規格</span></div>
+              <div class="col-2">
+                <input type="number" class="form-control form-control-custom" id="product-stock-2"
+                  placeholder="如: 25" min="0">
+                <div class="invalid-feedback-custom" id="product-stock-2-feedback">庫存必須 ≥ 0。</div>
+              </div>
+              <div class="col-2">
+                <input type="text" class="form-control form-control-custom" id="product-stock-unit-2"
+                  placeholder="包/袋/個">
+              </div>
+              <div class="col-3 d-flex align-items-center pt-1">
+                <span class="badge bg-secondary" style="font-size:0.72rem;">選填規格</span>
+              </div>
             </div>
             <!-- 規格 3 -->
-            <div class="row g-2 mb-3 align-items-center">
-              <div class="col-4">
-                <input type="text" class="form-control form-control-custom" id="product-unit-3" placeholder="如: 耳掛（選填）">
+            <div class="row g-2 mb-3 align-items-start">
+              <div class="col-3">
+                <input type="text" class="form-control form-control-custom" id="product-unit-3"
+                  placeholder="如: 耳掛（選填）">
               </div>
-              <div class="col-4">
-                <input type="number" class="form-control form-control-custom" id="product-price-3" placeholder="選填，> 0"
-                  min="1">
+              <div class="col-2">
+                <input type="number" class="form-control form-control-custom" id="product-price-3"
+                  placeholder="選填 > 0" min="1">
                 <div class="invalid-feedback-custom" id="product-price-3-feedback">價格必須大於 0。</div>
               </div>
-              <div class="col-4"><span class="badge bg-secondary fs-9">選填規格</span></div>
+              <div class="col-2">
+                <input type="number" class="form-control form-control-custom" id="product-stock-3"
+                  placeholder="如: 100" min="0">
+                <div class="invalid-feedback-custom" id="product-stock-3-feedback">庫存必須 ≥ 0。</div>
+              </div>
+              <div class="col-2">
+                <input type="text" class="form-control form-control-custom" id="product-stock-unit-3"
+                  placeholder="包/袋/個">
+              </div>
+              <div class="col-3 d-flex align-items-center pt-1">
+                <span class="badge bg-secondary" style="font-size:0.72rem;">選填規格</span>
+              </div>
             </div>
 
-            <!-- ── 原價/特價 & 庫存 ── -->
+            <!-- ── 原價/特價 ── -->
             <div class="row g-3 mb-3">
-              <div class="col-12 col-md-4">
+              <div class="col-12 col-md-6">
                 <label for="product-original-price" class="form-label form-label-custom">原價 (選填)</label>
                 <div class="input-group">
                   <span class="input-group-text bg-dark border-secondary text-secondary">NT$</span>
@@ -413,21 +452,14 @@
                 </div>
                 <div class="invalid-feedback-custom" id="product-original-price-feedback">原價必須大於 0。</div>
               </div>
-              <div class="col-12 col-md-4">
+              <div class="col-12 col-md-6">
                 <label for="product-sale-price" class="form-label form-label-custom">特價 (選填)</label>
                 <div class="input-group">
                   <span class="input-group-text bg-dark border-secondary text-secondary">NT$</span>
                   <input type="number" class="form-control form-control-custom" id="product-sale-price"
                     placeholder="如: 280" min="1">
                 </div>
-                <div class="invalid-feedback-custom" id="product-sale-price-feedback">特價必須 > 0 且不高於原價。</div>
-              </div>
-              <div class="col-12 col-md-4">
-                <label for="product-stock" class="form-label form-label-custom">庫存 <span
-                    class="text-danger">*</span></label>
-                <input type="number" class="form-control form-control-custom" id="product-stock" value="0" min="0"
-                  required>
-                <div class="invalid-feedback-custom" id="product-stock-feedback">庫存必須 ≥ 0 的整數。</div>
+                <div class="invalid-feedback-custom" id="product-sale-price-feedback">特價必須 &gt; 0 且不高於原價。</div>
               </div>
             </div>
 
