@@ -229,6 +229,21 @@
               <button class="order-tab" data-status="shipped">📦 已出貨</button>
               <button class="order-tab" data-status="completed">🎉 已完成</button>
               <button class="order-tab" data-status="cancelled">❌ 已取消</button>
+              
+              <!-- 年月切換控制元件 -->
+              <div class="month-switcher d-none" id="order-month-switcher">
+                <button type="button" class="btn-month-nav" id="btn-prev-month" title="上一個月">
+                  <i class="bi bi-chevron-left"></i>
+                </button>
+                <div class="month-display-wrap" title="點擊選擇月份">
+                  <i class="bi bi-calendar3 me-1" style="color: #C5A880; font-size: 0.85rem;"></i>
+                  <span class="month-display-text" id="month-display-text">2026 年 07 月</span>
+                  <input type="month" class="month-input-hidden" id="month-picker-input">
+                </div>
+                <button type="button" class="btn-month-nav" id="btn-next-month" title="下一個月">
+                  <i class="bi bi-chevron-right"></i>
+                </button>
+              </div>
             </div>
 
             <!-- Loading -->

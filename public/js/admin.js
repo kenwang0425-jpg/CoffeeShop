@@ -108,6 +108,11 @@
   const orderLoadingEl      = $('order-loading');
   const orderEmptyEl        = $('order-empty');
   const orderTabsEl         = $('order-tabs');
+  const orderMonthSwitcher  = $('order-month-switcher');
+  const btnPrevMonth        = $('btn-prev-month');
+  const btnNextMonth        = $('btn-next-month');
+  const monthDisplayText    = $('month-display-text');
+  const monthPickerInput    = $('month-picker-input');
 
   // 烘豆備料單 DOM
   const btnPrepSheet    = $('btn-prep-sheet');
@@ -134,6 +139,8 @@
   // 訂單管理 State
   let activeOrderStatus = '';      // 空字串 = 全部
   let orderPollTimer    = null;    // 30 秒輪詢計時器
+  let currentOrderYear  = new Date().getFullYear();
+  let currentOrderMonth = new Date().getMonth() + 1; // 1-12
 
   const DAY_NAMES = { 1: '星期一', 2: '星期二', 3: '星期三', 4: '星期四', 5: '星期五', 6: '星期六', 7: '星期日' };
 
@@ -916,6 +923,17 @@
     }
   }
 
+  /** 查詢並更新待處理計數 Badge */
+  async function fetchPendingCount() {
+    try {
+      const json = await apiFetch('/api/admin/orders?status=pending');
+      const count = (json.orders || []).length;
+      updatePendingBadge(count);
+    } catch (e) {
+      console.error('更新待處理訂單筆數失敗:', e);
+    }
+  }
+
   /** 輪詢控制 */
   function startOrderPolling() {
     stopOrderPolling();
@@ -932,15 +950,29 @@
       if (orderEmptyEl)   orderEmptyEl.classList.add('d-none');
       if (orderCardsContainer) orderCardsContainer.innerHTML = '';
     }
+    updateMonthSwitcherDisplay();
     try {
-      const url = status ? '/api/admin/orders?status=' + encodeURIComponent(status) : '/api/admin/orders';
+      let url = '/api/admin/orders';
+      const queryParams = [];
+      if (status) {
+        queryParams.push('status=' + encodeURIComponent(status));
+      }
+      if (status === 'completed' || status === 'cancelled' || (orderMonthSwitcher && !orderMonthSwitcher.classList.contains('d-none'))) {
+        queryParams.push('year=' + encodeURIComponent(currentOrderYear));
+        queryParams.push('month=' + encodeURIComponent(currentOrderMonth));
+      }
+      if (queryParams.length > 0) {
+        url += '?' + queryParams.join('&');
+      }
       const json = await apiFetch(url);
       const orders = json.orders || [];
 
-      // 無篩選時可準確計算待確認數
+      // 無篩選時可準確計算待確認數；若有篩選，也主動查詢更新待處理訂單筆數
       if (!status) {
         const pCount = orders.filter(function(o) { return o.status === 'pending'; }).length;
         updatePendingBadge(pCount);
+      } else {
+        fetchPendingCount();
       }
 
       if (orderLoadingEl) orderLoadingEl.classList.add('d-none');
@@ -1054,6 +1086,7 @@
           }
           sel.dataset.prevStatus = newStatus;
           showAlert('訂單狀態已更新');
+          fetchPendingCount();
           // 若有篩選且狀態改變，重新載入以移除該卡片
           if (activeOrderStatus && newStatus !== activeOrderStatus) {
             loadOrders(activeOrderStatus);
@@ -1078,11 +1111,31 @@
             body: JSON.stringify({ status: selEl.value, note: noteEl.value.trim() })
           });
           showAlert('備註已儲存');
+          fetchPendingCount();
         } catch (err) {
           showAlert('備註儲存失敗：' + err.message, 'danger');
         }
       });
     });
+  }
+
+  /** 更新年月切換器顯示與狀態 */
+  function updateMonthSwitcherDisplay() {
+    if (monthDisplayText) {
+      const mStr = String(currentOrderMonth).padStart(2, '0');
+      monthDisplayText.textContent = `${currentOrderYear} 年 ${mStr} 月`;
+    }
+    if (monthPickerInput) {
+      const mStr = String(currentOrderMonth).padStart(2, '0');
+      monthPickerInput.value = `${currentOrderYear}-${mStr}`;
+    }
+    if (orderMonthSwitcher) {
+      if (activeOrderStatus === 'completed' || activeOrderStatus === 'cancelled') {
+        orderMonthSwitcher.classList.remove('d-none');
+      } else {
+        orderMonthSwitcher.classList.add('d-none');
+      }
+    }
   }
 
   // Tab 切換
@@ -1093,7 +1146,56 @@
       orderTabsEl.querySelectorAll('.order-tab').forEach(function(t) { t.classList.remove('active'); });
       tab.classList.add('active');
       activeOrderStatus = tab.dataset.status || '';
+      
+      // 當切換至「已完成」或「已取消」頁籤時，預設帶入當前年月
+      if (activeOrderStatus === 'completed' || activeOrderStatus === 'cancelled') {
+        const now = new Date();
+        currentOrderYear = now.getFullYear();
+        currentOrderMonth = now.getMonth() + 1;
+      }
+      
       loadOrders(activeOrderStatus);
+    });
+  }
+
+  // 年月切換控制按鈕
+  if (btnPrevMonth) {
+    btnPrevMonth.addEventListener('click', function() {
+      currentOrderMonth--;
+      if (currentOrderMonth < 1) {
+        currentOrderMonth = 12;
+        currentOrderYear--;
+      }
+      loadOrders(activeOrderStatus);
+    });
+  }
+
+  if (btnNextMonth) {
+    btnNextMonth.addEventListener('click', function() {
+      currentOrderMonth++;
+      if (currentOrderMonth > 12) {
+        currentOrderMonth = 1;
+        currentOrderYear++;
+      }
+      loadOrders(activeOrderStatus);
+    });
+  }
+
+  if (monthPickerInput) {
+    monthPickerInput.addEventListener('change', function(e) {
+      const val = e.target.value;
+      if (val) {
+        const parts = val.split('-');
+        if (parts.length === 2) {
+          const y = parseInt(parts[0], 10);
+          const m = parseInt(parts[1], 10);
+          if (!isNaN(y) && !isNaN(m)) {
+            currentOrderYear = y;
+            currentOrderMonth = m;
+            loadOrders(activeOrderStatus);
+          }
+        }
+      }
     });
   }
 
@@ -1320,11 +1422,7 @@
     loadProducts(); // 預設顯示商品管理
 
     // 頁面啟動時先載入待確認數量，更新 sidebar badge
-    apiFetch('/api/admin/orders?status=pending')
-      .then(function(json) {
-        updatePendingBadge((json.orders || []).length);
-      })
-      .catch(function() {});
+    fetchPendingCount();
   }
 
   if (document.readyState === 'loading') {

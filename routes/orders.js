@@ -68,10 +68,26 @@ router.post('/', async (req, res) => {
   }
 });
 
+// ─── GET /api/orders ──────────────────────────────────────────────────────────
+// 訂單查詢 API，支援 ?status=、?year=、?month= 篩選
+router.get('/', async (req, res) => {
+  try {
+    const { status, year, month } = req.query;
+    const VALID_ORDER_STATUSES = ['pending', 'confirmed', 'shipped', 'completed', 'cancelled'];
+    const statusFilter = (status && VALID_ORDER_STATUSES.includes(status)) ? status : null;
+    const orders = await db.getAdminOrders(statusFilter, year, month);
+    res.json({ success: true, orders });
+  } catch (err) {
+    console.error('❌ [GET /api/orders] 查詢失敗:', err.message);
+    res.status(500).json({ success: false, message: '查詢訂單時發生錯誤：' + err.message });
+  }
+});
+
 // ─── GET /api/orders/customer/:phone ─────────────────────────────────────────
 // 依手機號碼查詢顧客所有歷史訂單（含明細），由新到舊排序
 router.get('/customer/:phone', async (req, res) => {
   const { phone } = req.params;
+  const { year, month } = req.query;
 
   if (!phone || String(phone).trim() === '') {
     return res.status(400).json({ success: false, message: '手機號碼為必填欄位。' });
@@ -79,7 +95,7 @@ router.get('/customer/:phone', async (req, res) => {
 
   try {
     // 使用 db.js 中已正確設定的連線池，避免重複建立 Pool 且連線參數錯誤
-    const orders = await db.getOrdersByPhone(String(phone).trim());
+    const orders = await db.getOrdersByPhone(String(phone).trim(), year, month);
     res.json({ success: true, orders });
   } catch (err) {
     console.error('❌ [GET /api/orders/customer/:phone] 查詢失敗:', err.message);

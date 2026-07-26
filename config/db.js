@@ -855,23 +855,56 @@ async function getCustomerByPhone(phone) {
 // ============================================================
 
 /**
- * 依電話號碼查詢顧客所有歷史訂單（含明細），由新到舊排序
+ * 依電話號碼查詢顧客所有歷史訂單（依年月篩選，含明細），由新到舊排序
  * @param {string} phone
+ * @param {string|number|null} year
+ * @param {string|number|null} month
  * @returns {Array} 訂單陣列，每筆含 items 明細
  */
-async function getOrdersByPhone(phone) {
+async function getOrdersByPhone(phone, year, month) {
   if (!pool) {
     throw new Error('資料庫未啟用，無法查詢訂單。');
   }
+
+  const conditions = ['customer_phone = $1', "status != 'cancelled'"];
+  const params = [String(phone).trim()];
+
+  if (year !== undefined && year !== null && year !== '' && month !== undefined && month !== null && month !== '') {
+    const y = parseInt(year, 10);
+    const m = parseInt(month, 10);
+    if (!isNaN(y) && !isNaN(m) && m >= 1 && m <= 12) {
+      const mStr = String(m).padStart(2, '0');
+      const startDate = `${y}-${mStr}-01`;
+      const nextY = m === 12 ? y + 1 : y;
+      const nextM = m === 12 ? 1 : m + 1;
+      const nextMStr = String(nextM).padStart(2, '0');
+      const endDate = `${nextY}-${nextMStr}-01`;
+
+      params.push(startDate);
+      conditions.push(`created_at >= $${params.length}`);
+      params.push(endDate);
+      conditions.push(`created_at < $${params.length}`);
+    }
+  } else if (year !== undefined && year !== null && year !== '') {
+    const y = parseInt(year, 10);
+    if (!isNaN(y)) {
+      const startDate = `${y}-01-01`;
+      const endDate = `${y + 1}-01-01`;
+      params.push(startDate);
+      conditions.push(`created_at >= $${params.length}`);
+      params.push(endDate);
+      conditions.push(`created_at < $${params.length}`);
+    }
+  }
+
   // 查詢主表（排除已取消訂單，顧客端不顯示）
   const ordersResult = await pool.query(
     `SELECT id, customer_phone, customer_name, shipping_address,
             total_amount, note, status, created_at
      FROM orders
-     WHERE customer_phone = $1
-       AND status != 'cancelled'
+     WHERE ${conditions.join(' AND ')}
      ORDER BY created_at DESC`,
-    [String(phone).trim()]
+    params
   );
 
   if (ordersResult.rows.length === 0) return [];
@@ -913,11 +946,13 @@ async function getOrdersByPhone(phone) {
 }
 
 /**
- * 後台：查詢訂單列表（依狀態篩選），含明細，由新到舊排序
+ * 後台：查詢訂單列表（依狀態、年月篩選），含明細，由新到舊排序
  * @param {string|null} statusFilter  'pending'|'confirmed'|'shipped'|'completed'|'cancelled'|null(全部)
+ * @param {string|number|null} year   年份（例如 2026）
+ * @param {string|number|null} month  月份（例如 7 或 "07"）
  * @returns {Array}
  */
-async function getAdminOrders(statusFilter) {
+async function getAdminOrders(statusFilter, year, month) {
   if (!pool) {
     throw new Error('資料庫未啟用，無法查詢訂單。');
   }
@@ -925,22 +960,53 @@ async function getAdminOrders(statusFilter) {
   const VALID_STATUSES = ['pending', 'confirmed', 'shipped', 'completed', 'cancelled'];
   const useFilter = statusFilter && VALID_STATUSES.includes(statusFilter);
 
+  const conditions = [];
+  const params = [];
+
+  if (useFilter) {
+    params.push(statusFilter);
+    conditions.push(`status = $${params.length}`);
+  }
+
+  if (year !== undefined && year !== null && year !== '' && month !== undefined && month !== null && month !== '') {
+    const y = parseInt(year, 10);
+    const m = parseInt(month, 10);
+    if (!isNaN(y) && !isNaN(m) && m >= 1 && m <= 12) {
+      const mStr = String(m).padStart(2, '0');
+      const startDate = `${y}-${mStr}-01`;
+      const nextY = m === 12 ? y + 1 : y;
+      const nextM = m === 12 ? 1 : m + 1;
+      const nextMStr = String(nextM).padStart(2, '0');
+      const endDate = `${nextY}-${nextMStr}-01`;
+
+      params.push(startDate);
+      conditions.push(`created_at >= $${params.length}`);
+      params.push(endDate);
+      conditions.push(`created_at < $${params.length}`);
+    }
+  } else if (year !== undefined && year !== null && year !== '') {
+    const y = parseInt(year, 10);
+    if (!isNaN(y)) {
+      const startDate = `${y}-01-01`;
+      const endDate = `${y + 1}-01-01`;
+      params.push(startDate);
+      conditions.push(`created_at >= $${params.length}`);
+      params.push(endDate);
+      conditions.push(`created_at < $${params.length}`);
+    }
+  }
+
+  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+  const querySql = `
+    SELECT id, customer_phone, customer_name, shipping_address,
+           total_amount, note, status, created_at
+    FROM orders
+    ${whereClause}
+    ORDER BY created_at DESC
+  `;
+
   // 查詢主表
-  const ordersResult = useFilter
-    ? await pool.query(
-        `SELECT id, customer_phone, customer_name, shipping_address,
-                total_amount, note, status, created_at
-         FROM orders
-         WHERE status = $1
-         ORDER BY created_at DESC`,
-        [statusFilter]
-      )
-    : await pool.query(
-        `SELECT id, customer_phone, customer_name, shipping_address,
-                total_amount, note, status, created_at
-         FROM orders
-         ORDER BY created_at DESC`
-      );
+  const ordersResult = await pool.query(querySql, params);
 
   if (ordersResult.rows.length === 0) return [];
 

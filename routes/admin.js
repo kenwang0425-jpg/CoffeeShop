@@ -67,9 +67,9 @@ const VALID_ORDER_STATUSES = ['pending', 'confirmed', 'shipped', 'completed', 'c
 
 router.get('/orders', async (req, res) => {
   try {
-    const { status } = req.query;
+    const { status, year, month } = req.query;
     const statusFilter = (status && VALID_ORDER_STATUSES.includes(status)) ? status : null;
-    const orders = await db.getAdminOrders(statusFilter);
+    const orders = await db.getAdminOrders(statusFilter, year, month);
     res.json({ success: true, orders });
   } catch (err) {
     console.error('❌ [GET /api/admin/orders] 查詢失敗:', err.message);
