@@ -160,13 +160,16 @@ BEGIN
   INSERT INTO BusinessHours (DayOfWeek, IsOpen) VALUES 
   (1, 0), (2, 1), (3, 1), (4, 1), (5, 1), (6, 1), (7, 1);
 
-  -- 預設時段 (二到日)
-  DECLARE @day INT = 2;
-  WHILE @day <= 7
+  -- 預設時段 (二到日，僅在無任何時段設定時才寫入)
+  IF NOT EXISTS (SELECT * FROM BusinessHourSlots)
   BEGIN
-    INSERT INTO BusinessHourSlots (DayOfWeek, StartTime, EndTime)
-    VALUES (@day, '11:00', '14:30'), (@day, '17:00', '21:00');
-    SET @day = @day + 1;
+    DECLARE @day INT = 2;
+    WHILE @day <= 7
+    BEGIN
+      INSERT INTO BusinessHourSlots (DayOfWeek, StartTime, EndTime)
+      VALUES (@day, '11:00', '14:30'), (@day, '17:00', '21:00');
+      SET @day = @day + 1;
+    END
   END
 END
 GO

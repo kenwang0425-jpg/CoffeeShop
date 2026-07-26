@@ -303,12 +303,14 @@ async function initializeDB() {
       ON CONFLICT (DayOfWeek) DO NOTHING;
 
       INSERT INTO BusinessHourSlots (DayOfWeek, StartTime, EndTime)
-      SELECT d, '11:00', '14:30' FROM generate_series(2, 7) AS d
-      WHERE NOT EXISTS (SELECT 1 FROM BusinessHourSlots WHERE StartTime = '11:00' AND EndTime = '14:30');
-
-      INSERT INTO BusinessHourSlots (DayOfWeek, StartTime, EndTime)
-      SELECT d, '17:00', '21:00' FROM generate_series(2, 7) AS d
-      WHERE NOT EXISTS (SELECT 1 FROM BusinessHourSlots WHERE StartTime = '17:00' AND EndTime = '21:00');
+      SELECT d, s.StartTime, s.EndTime
+      FROM generate_series(2, 7) AS d
+      CROSS JOIN (
+        SELECT '11:00' AS StartTime, '14:30' AS EndTime
+        UNION ALL
+        SELECT '17:00', '21:00'
+      ) AS s
+      WHERE NOT EXISTS (SELECT 1 FROM BusinessHourSlots);
     `;
     await pool.query(initDataQuery);
 
@@ -693,8 +695,8 @@ async function getBusinessHours() {
       const days = [];
 
       for (let i = 1; i <= 7; i++) {
-        const hourRow = hoursResult.rows.find(r => (r.dayofweek || r.DayOfWeek) === i);
-        const slotsRow = slotsResult.rows.filter(r => (r.dayofweek || r.DayOfWeek) === i);
+        const hourRow = hoursResult.rows.find(r => Number(r.dayofweek ?? r.DayOfWeek) === i);
+        const slotsRow = slotsResult.rows.filter(r => Number(r.dayofweek ?? r.DayOfWeek) === i);
 
         days.push({
           dayOfWeek: i,
@@ -703,6 +705,8 @@ async function getBusinessHours() {
         });
       }
 
+      // 同步更新記憶體變數，確保快取與資料庫一致
+      mockBusinessHours = { announcement, days };
       return { announcement, days };
     } catch (err) {
       console.error('PostgreSQL BusinessHours 查詢錯誤，使用記憶體變數代替:', err.message);
@@ -725,14 +729,14 @@ async function saveBusinessHours(data) {
         [data.announcement || '']
       );
 
-      // 清除舊資料
-      await client.query('DELETE FROM BusinessHours');
+      // 清除舊時段，但對 BusinessHours 執行 UPDATE/INSERT (UPSERT)
       await client.query('DELETE FROM BusinessHourSlots');
 
       if (data.days && Array.isArray(data.days)) {
         for (const day of data.days) {
           await client.query(
-            'INSERT INTO BusinessHours (DayOfWeek, IsOpen) VALUES ($1, $2)',
+            `INSERT INTO BusinessHours (DayOfWeek, IsOpen) VALUES ($1, $2)
+             ON CONFLICT (DayOfWeek) DO UPDATE SET IsOpen = EXCLUDED.IsOpen`,
             [day.dayOfWeek, Boolean(day.isOpen)]
           );
 
@@ -751,6 +755,8 @@ async function saveBusinessHours(data) {
 
       await client.query('COMMIT');
       client.release();
+      // 同步更新記憶體變數，確保快取與資料庫保持一致
+      mockBusinessHours = JSON.parse(JSON.stringify(data));
       return true;
     } catch (err) {
       await client.query('ROLLBACK');
