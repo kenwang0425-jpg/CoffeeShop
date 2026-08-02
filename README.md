@@ -217,3 +217,41 @@ PostgreSQL 預設外部 Port 為 5432。若 NAS 上已部署其他服務（如 I
 
 ---
 *本專案由 Antigravity AI 協同開發，展示了從需求理解、架構規劃到 UI/UX 與後端 API 串接的高效完整流程。*
+
+## 🚀 開發進度紀錄 (2026-08-02)
+
+### 📦 1. 新增「進貨商管理 (Supplier Management)」模組
+為了將後勤供應鏈納入系統管理，已完成「進貨商管理」後台模組的開發，支援全方位材料來源（生豆商、包材商、設備耗材商等）的 CRUD 操作與評鑑機制。
+
+#### 核心功能與特點：
+* **統一資料庫連線**：嚴格遵循 Singleton 模式，全模組統一引用現有 `config/db.js` 連線檔，確保 PostgreSQL 連線池（Connection Pool）一致性與穩定度。
+* **供應商評鑑與自我評價**：支援 1~5 星級評鑑（⭐）與文字評價備註，作為未來進貨優先順序之參考。
+* **智慧地址/官網識別**：在列表頁面自動判斷 `address_or_url` 欄位內容：
+  * 若為 `http://` 或 `https://` 開頭，自動渲染為帶有 🔗 圖示的超連結，點擊可直接開啟新頁籤。
+  * 若為實體地址，則自動加上 📍 圖示並呈現在列表，提升檢視效率。
+* **資料庫 Seed 腳本**：建立 `seed-suppliers.js` 測試資料腳本，自動寫入 8 家涵蓋「生豆商、包材商、設備耗材商、其他」類別之擬真進貨商資料。
+
+#### 相關檔案異動：
+* **Database**: `suppliers` 資料表 (PostgreSQL)
+* **Backend**: `routes/suppliers.js`, `config/db.js` (新增供應商 CRUD API 與 Mock 雙軌備援)
+* **Frontend**: `public/dashboard.html`, `public/js/admin.js`, `public/css/admin.css`
+
+---
+
+### 📌 下階段開發規劃 (Pending / Next Steps)
+
+#### ☕ 「進貨管理 (Purchase Management)」模組實作
+目前已完成商業邏輯與資料庫 Schema 規劃，下一次開發重點如下：
+
+1. **進貨單與明細表 (Header-Detail Structure)**：
+   * 建立 `purchases` (進貨單主表) 與 `purchase_items` (進貨明細表)。
+   * 支援 PostgreSQL Transaction (`BEGIN` / `COMMIT` / `ROLLBACK`) 確保多品項進貨時的一致性。
+
+2. **生豆與包材動態欄位分流**：
+   * **生豆類別**：包含生豆批號/產季 (`batch_no`，如 `C192`)、產區 (`origin`)、處理法 (`process_method`)，並設置預留庫存欄位 (`remaining_quantity`)。
+   * **包材/耗材類別**：針對規格與數量做簡易進貨管理。
+
+3. **預留「生豆出庫與烘焙紀錄 (Roasting Batches)」對接**：
+   * 本模組之進貨生豆將獨立於前端購物車（熟豆銷售），未來將透過獨立的「生豆出庫/烘焙紀錄表」進行烘焙失重率計算與熟豆庫存轉換。
+
+   

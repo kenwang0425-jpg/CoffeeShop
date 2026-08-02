@@ -23,12 +23,16 @@
   const menuOrdering      = $('menu-ordering');
   const menuBusinessHours = $('menu-business-hours');
   const menuOrders        = $('menu-orders');
+  const menuSuppliers     = $('menu-suppliers');
+  const menuPurchases     = $('menu-purchases');
 
   // 內容區塊
   const sectionProducts      = $('section-products');
   const sectionOrdering      = $('section-ordering');
   const sectionBusinessHours = $('section-business-hours');
   const sectionOrders        = $('section-orders');
+  const sectionSuppliers     = $('section-suppliers');
+  const sectionPurchases     = $('section-purchases');
 
   // 標題
   const pageTitle    = document.querySelector('.page-title');
@@ -124,6 +128,8 @@
   let productModalBS = null;
   let deleteModalBS  = null;
   let roastModalBS   = null;
+  let supplierModalBS = null;
+  let purchaseModalBS = null;
 
   // ════════════════════════════════════════════════════
   //  State
@@ -176,9 +182,9 @@
   // ════════════════════════════════════════════════════
   function switchSection(section) {
     // 隱藏全部區塊
-    [sectionProducts, sectionOrdering, sectionBusinessHours, sectionOrders]
+    [sectionProducts, sectionOrdering, sectionBusinessHours, sectionOrders, sectionSuppliers, sectionPurchases]
       .forEach(s => { if (s) s.classList.add('d-none'); });
-    [menuProducts, menuOrdering, menuBusinessHours, menuOrders]
+    [menuProducts, menuOrdering, menuBusinessHours, menuOrders, menuSuppliers, menuPurchases]
       .forEach(m => { if (m) m.classList.remove('active'); });
 
     // 離開訂單頁時停止輪詢
@@ -205,6 +211,16 @@
       if (pageTitle) pageTitle.textContent = '訂單管理';
       loadOrders(activeOrderStatus);
       startOrderPolling();
+    } else if (section === 'suppliers') {
+      if (sectionSuppliers) sectionSuppliers.classList.remove('d-none');
+      if (menuSuppliers) menuSuppliers.classList.add('active');
+      if (pageTitle) pageTitle.textContent = '進貨商管理';
+      loadSuppliers();
+    } else if (section === 'purchases') {
+      if (sectionPurchases) sectionPurchases.classList.remove('d-none');
+      if (menuPurchases) menuPurchases.classList.add('active');
+      if (pageTitle) pageTitle.textContent = '進貨管理';
+      loadPurchases();
     }
   }
 
@@ -212,6 +228,8 @@
   menuOrdering.querySelector('a').addEventListener('click', e => { e.preventDefault(); switchSection('ordering'); });
   menuBusinessHours.querySelector('a').addEventListener('click', e => { e.preventDefault(); switchSection('business-hours'); });
   if (menuOrders) menuOrders.querySelector('a').addEventListener('click', e => { e.preventDefault(); switchSection('orders'); });
+  if (menuSuppliers) menuSuppliers.querySelector('a').addEventListener('click', e => { e.preventDefault(); switchSection('suppliers'); });
+  if (menuPurchases) menuPurchases.querySelector('a').addEventListener('click', e => { e.preventDefault(); switchSection('purchases'); });
 
   // ════════════════════════════════════════════════════
   //  登出
@@ -1398,6 +1416,549 @@
   }
 
   // ════════════════════════════════════════════════════
+  //  ─── 進貨商管理 ───
+  // ════════════════════════════════════════════════════
+
+  let allSuppliers = [];
+  let currentSupplierEditID = null;
+  let activeSupplierCategory = 'all';
+
+  async function loadSuppliers() {
+    const loading = $('supplier-loading-spinner');
+    const tbody = $('supplier-list-body');
+    const empty = $('supplier-empty-state');
+    
+    if (loading) loading.classList.remove('d-none');
+    if (tbody) tbody.innerHTML = '';
+    if (empty) empty.classList.add('d-none');
+    
+    try {
+      const kw = $('supplier-search-input') ? $('supplier-search-input').value.trim() : '';
+      let url = '/api/suppliers?';
+      if (activeSupplierCategory !== 'all') url += `category=${encodeURIComponent(activeSupplierCategory)}&`;
+      if (kw) url += `keyword=${encodeURIComponent(kw)}`;
+      
+      const json = await apiFetch(url);
+      allSuppliers = json.data || [];
+      renderSuppliers(allSuppliers);
+    } catch (err) {
+      showAlert('取得進貨商列表失敗：' + err.message, 'danger');
+    } finally {
+      if (loading) loading.classList.add('d-none');
+    }
+  }
+
+  function renderSuppliers(list) {
+    const tbody = $('supplier-list-body');
+    const empty = $('supplier-empty-state');
+    const tableContainer = $('supplier-table-container');
+    if (!tbody || !empty || !tableContainer) return;
+
+    if (list.length === 0) {
+      empty.classList.remove('d-none');
+      tableContainer.classList.add('d-none');
+      return;
+    }
+    
+    empty.classList.add('d-none');
+    tableContainer.classList.remove('d-none');
+    tbody.innerHTML = '';
+
+    list.forEach(item => {
+      let catColor = 'secondary';
+      if (item.category === '生豆商') catColor = 'success';
+      else if (item.category === '包材商') catColor = 'info';
+      else if (item.category === '設備耗材商') catColor = 'warning';
+
+      let statusBadge = item.status === 'active' 
+        ? `<span class="badge bg-primary">合作中</span>`
+        : `<span class="badge bg-secondary">暫停合作</span>`;
+
+      let stars = '';
+      for (let i=1; i<=5; i++) {
+        stars += i <= item.rating 
+          ? `<i class="bi bi-star-fill text-warning"></i>` 
+          : `<i class="bi bi-star text-warning"></i>`;
+      }
+
+      let addressOrUrlHtml = '<span class="text-muted">-</span>';
+      if (item.address_or_url && item.address_or_url.trim() !== '') {
+        const val = item.address_or_url.trim();
+        if (val.startsWith('http://') || val.startsWith('https://')) {
+          addressOrUrlHtml = `<a href="${val}" target="_blank" rel="noopener noreferrer" class="text-info text-decoration-none d-inline-block text-truncate" style="max-width: 180px;" title="${escHtml(val)}"><i class="bi bi-link-45deg me-1"></i>${escHtml(val)}</a>`;
+        } else {
+          addressOrUrlHtml = `<span><i class="bi bi-geo-alt me-1 text-muted"></i>${escHtml(val)}</span>`;
+        }
+      }
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="fw-bold align-middle">${escHtml(item.name)}</td>
+        <td class="align-middle"><span class="badge bg-${catColor} text-dark">${escHtml(item.category)}</span></td>
+        <td class="align-middle">
+          <div><i class="bi bi-person me-1"></i>${escHtml(item.contact_person || '無')}</div>
+          <div><i class="bi bi-telephone me-1"></i>${escHtml(item.phone || '無')}</div>
+        </td>
+        <td class="align-middle">
+          <div class="mb-1">${stars}</div>
+          <small class="text-muted text-truncate d-block" style="max-width: 200px;" title="${escHtml(item.evaluation_notes)}">
+            ${escHtml(item.evaluation_notes || '無備註')}
+          </small>
+        </td>
+        <td class="align-middle">${addressOrUrlHtml}</td>
+        <td class="align-middle">${statusBadge}</td>
+        <td class="align-middle text-center">
+          <button class="btn btn-sm btn-outline-info me-1 btn-edit-supplier" data-id="${item.id}" title="編輯">
+            <i class="bi bi-pencil-fill"></i>
+          </button>
+          <button class="btn btn-sm btn-outline-danger btn-delete-supplier" data-id="${item.id}" title="刪除">
+            <i class="bi bi-trash-fill"></i>
+          </button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    // 綁定編輯與刪除按鈕
+    document.querySelectorAll('.btn-edit-supplier').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const id = e.currentTarget.getAttribute('data-id');
+        openSupplierModal(id);
+      });
+    });
+
+    document.querySelectorAll('.btn-delete-supplier').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const id = e.currentTarget.getAttribute('data-id');
+        const supplier = allSuppliers.find(s => String(s.id) === String(id));
+        if (supplier && confirm(`確認要刪除進貨商「${supplier.name}」嗎？`)) {
+          doDeleteSupplier(id);
+        }
+      });
+    });
+  }
+
+  function openSupplierModal(id = null) {
+    const form = $('supplier-form');
+    const title = $('supplier-modal-title');
+    if (!form || !supplierModalBS) return;
+
+    form.reset();
+    form.classList.remove('was-validated');
+    
+    // reset stars
+    setSupplierRating(3);
+
+    currentSupplierEditID = id;
+
+    if (id) {
+      const supplier = allSuppliers.find(s => String(s.id) === String(id));
+      if (!supplier) return;
+      title.innerHTML = '<i class="bi bi-pencil-square me-2"></i>編輯進貨商';
+      
+      $('supplier-name').value = supplier.name;
+      $('supplier-category').value = supplier.category;
+      $('supplier-contact').value = supplier.contact_person || '';
+      $('supplier-phone').value = supplier.phone || '';
+      $('supplier-email').value = supplier.email || '';
+      $('supplier-address-url').value = supplier.address_or_url || '';
+      $('supplier-status').value = supplier.status || 'active';
+      $('supplier-notes').value = supplier.evaluation_notes || '';
+      setSupplierRating(supplier.rating || 3);
+    } else {
+      title.innerHTML = '<i class="bi bi-plus-circle me-2"></i>新增進貨商';
+    }
+
+    supplierModalBS.show();
+  }
+
+  function setSupplierRating(val) {
+    const input = $('supplier-rating');
+    if (input) input.value = val;
+    document.querySelectorAll('#supplier-rating-input .star-select').forEach(star => {
+      const starVal = parseInt(star.getAttribute('data-val'), 10);
+      if (starVal <= val) {
+        star.classList.replace('bi-star', 'bi-star-fill');
+      } else {
+        star.classList.replace('bi-star-fill', 'bi-star');
+      }
+    });
+  }
+
+  async function saveSupplier(e) {
+    e.preventDefault();
+    const form = $('supplier-form');
+    if (!form.checkValidity()) {
+      e.stopPropagation();
+      form.classList.add('was-validated');
+      return;
+    }
+
+    const payload = {
+      name: $('supplier-name').value.trim(),
+      category: $('supplier-category').value,
+      contact_person: $('supplier-contact').value.trim(),
+      phone: $('supplier-phone').value.trim(),
+      email: $('supplier-email').value.trim(),
+      address_or_url: $('supplier-address-url').value.trim(),
+      rating: parseInt($('supplier-rating').value, 10),
+      status: $('supplier-status').value,
+      evaluation_notes: $('supplier-notes').value.trim()
+    };
+
+    const btnText = $('btn-save-supplier-text');
+    const spinner = $('btn-save-supplier-spinner');
+    if (btnText) btnText.textContent = '處理中...';
+    if (spinner) spinner.classList.remove('d-none');
+
+    try {
+      let res;
+      if (currentSupplierEditID) {
+        res = await apiFetch(`/api/suppliers/${currentSupplierEditID}`, {
+          method: 'PUT',
+          body: JSON.stringify(payload)
+        });
+        showAlert('進貨商修改成功！', 'success');
+      } else {
+        res = await apiFetch('/api/suppliers', {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        });
+        showAlert('進貨商新增成功！', 'success');
+      }
+      supplierModalBS.hide();
+      loadSuppliers();
+    } catch (err) {
+      showAlert(err.message, 'danger');
+    } finally {
+      if (btnText) btnText.textContent = '儲存';
+      if (spinner) spinner.classList.add('d-none');
+    }
+  }
+
+  async function doDeleteSupplier(id) {
+    try {
+      await apiFetch(`/api/suppliers/${id}`, { method: 'DELETE' });
+      showAlert('進貨商刪除成功！', 'success');
+      loadSuppliers();
+    } catch (err) {
+      showAlert('刪除失敗：' + err.message, 'danger');
+    }
+  }
+
+  // 綁定事件
+  if ($('btn-add-supplier')) {
+    $('btn-add-supplier').addEventListener('click', () => openSupplierModal(null));
+  }
+  
+  if ($('supplier-form')) {
+    $('supplier-form').addEventListener('submit', saveSupplier);
+  }
+
+  if ($('supplier-search-input')) {
+    let searchTimeout;
+    $('supplier-search-input').addEventListener('input', () => {
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(loadSuppliers, 500);
+    });
+  }
+
+  document.querySelectorAll('.supplier-filter-tab').forEach(tab => {
+    tab.addEventListener('click', (e) => {
+      document.querySelectorAll('.supplier-filter-tab').forEach(t => t.classList.remove('active'));
+      e.currentTarget.classList.add('active');
+      activeSupplierCategory = e.currentTarget.getAttribute('data-cat');
+      loadSuppliers();
+    });
+  });
+
+  document.querySelectorAll('#supplier-rating-input .star-select').forEach(star => {
+    star.addEventListener('click', (e) => {
+      const val = parseInt(e.currentTarget.getAttribute('data-val'), 10);
+      setSupplierRating(val);
+    });
+  });
+
+  // ════════════════════════════════════════════════════
+  //  ─── 進貨管理 ───
+  // ════════════════════════════════════════════════════
+  let allPurchases = [];
+  
+  async function loadPurchases() {
+    const loading = $('purchase-loading-spinner');
+    const tbody = $('purchase-list-body');
+    const empty = $('purchase-empty-state');
+    
+    if (loading) loading.classList.remove('d-none');
+    if (tbody) tbody.innerHTML = '';
+    if (empty) empty.classList.add('d-none');
+    
+    try {
+      let url = '/api/purchases?';
+      const sd = $('purchase-start-date') ? $('purchase-start-date').value : '';
+      const ed = $('purchase-end-date') ? $('purchase-end-date').value : '';
+      const sid = $('purchase-supplier-filter') ? $('purchase-supplier-filter').value : '';
+      
+      if (sd) url += `startDate=${encodeURIComponent(sd)}&`;
+      if (ed) url += `endDate=${encodeURIComponent(ed)}&`;
+      if (sid) url += `supplierId=${encodeURIComponent(sid)}`;
+      
+      const json = await apiFetch(url);
+      allPurchases = json.data || [];
+      renderPurchases(allPurchases);
+    } catch (err) {
+      showAlert('取得進貨單列表失敗：' + err.message, 'danger');
+    } finally {
+      if (loading) loading.classList.add('d-none');
+    }
+  }
+
+  function renderPurchases(list) {
+    const tbody = $('purchase-list-body');
+    const empty = $('purchase-empty-state');
+    const tableContainer = $('purchase-table-container');
+    if (!tbody || !empty || !tableContainer) return;
+
+    if (list.length === 0) {
+      empty.classList.remove('d-none');
+      tableContainer.classList.add('d-none');
+      return;
+    }
+    
+    empty.classList.add('d-none');
+    tableContainer.classList.remove('d-none');
+    tbody.innerHTML = '';
+
+    list.forEach(p => {
+      let statusBadge = p.status === 'completed' 
+        ? `<span class="badge bg-success">已入庫</span>`
+        : `<span class="badge bg-warning text-dark">待到貨</span>`;
+        
+      const items = p.items || [];
+      const types = Array.from(new Set(items.map(i => i.item_type))).join(', ');
+      const totalAmount = Number(p.total_amount).toLocaleString();
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="fw-bold align-middle">${escHtml(p.id)}</td>
+        <td class="align-middle">${escHtml(p.purchase_date.substring(0, 10))}</td>
+        <td class="align-middle">${escHtml(p.supplier_name || '無')}</td>
+        <td class="align-middle"><span class="badge bg-secondary text-light">${escHtml(types || '無')}</span></td>
+        <td class="align-middle fw-bold">${items.length} 項</td>
+        <td class="align-middle text-warning fw-bold">$${totalAmount}</td>
+        <td class="align-middle">${statusBadge}</td>
+        <td class="align-middle text-center">
+          <button class="btn btn-sm btn-outline-info me-1 btn-toggle-purchase-status" data-id="${p.id}" data-status="${p.status}" title="切換狀態">
+            <i class="bi bi-arrow-repeat"></i>
+          </button>
+          <button class="btn btn-sm btn-outline-danger btn-delete-purchase" data-id="${p.id}" title="刪除">
+            <i class="bi bi-trash-fill"></i>
+          </button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    document.querySelectorAll('.btn-toggle-purchase-status').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const id = e.currentTarget.getAttribute('data-id');
+        const currentStatus = e.currentTarget.getAttribute('data-status');
+        const newStatus = currentStatus === 'completed' ? 'pending' : 'completed';
+        try {
+          await apiFetch(`/api/purchases/${id}/status`, { method: 'PUT', body: JSON.stringify({ status: newStatus }) });
+          showAlert('狀態切換成功！', 'success');
+          loadPurchases();
+        } catch (err) {
+          showAlert('狀態切換失敗：' + err.message, 'danger');
+        }
+      });
+    });
+
+    document.querySelectorAll('.btn-delete-purchase').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const id = e.currentTarget.getAttribute('data-id');
+        if (confirm(`確認要刪除進貨單「${id}」嗎？這將連同所有明細一併刪除。`)) {
+          try {
+            await apiFetch(`/api/purchases/${id}`, { method: 'DELETE' });
+            showAlert('進貨單刪除成功！', 'success');
+            loadPurchases();
+          } catch (err) {
+            showAlert('刪除失敗：' + err.message, 'danger');
+          }
+        }
+      });
+    });
+  }
+
+  async function loadSupplierOptions() {
+    const sel1 = $('purchase-supplier-filter');
+    const sel2 = $('modal-purchase-supplier');
+    try {
+      const json = await apiFetch('/api/suppliers');
+      const suppliers = json.data || [];
+      
+      if (sel1) {
+        sel1.innerHTML = '<option value="">全部進貨商</option>';
+        suppliers.forEach(s => sel1.innerHTML += `<option value="${s.id}">${escHtml(s.name)}</option>`);
+      }
+      if (sel2) {
+        sel2.innerHTML = '<option value="">── 請選擇進貨商 ──</option>';
+        suppliers.forEach(s => sel2.innerHTML += `<option value="${s.id}">${escHtml(s.name)}</option>`);
+      }
+    } catch(err) {
+      console.error('載入進貨商選項失敗:', err);
+    }
+  }
+
+  function openPurchaseModal() {
+    const form = $('purchase-form');
+    if (!form || !purchaseModalBS) return;
+
+    form.reset();
+    form.classList.remove('was-validated');
+    
+    const today = new Date().toISOString().substring(0, 10);
+    if ($('modal-purchase-date')) $('modal-purchase-date').value = today;
+    
+    $('purchase-items-body').innerHTML = '';
+    $('purchase-total-amount').textContent = '0';
+    $('purchase-items-empty').classList.remove('d-none');
+    
+    loadSupplierOptions();
+    purchaseModalBS.show();
+  }
+
+  function addPurchaseItemRow() {
+    $('purchase-items-empty').classList.add('d-none');
+    const tbody = $('purchase-items-body');
+    const tr = document.createElement('tr');
+    tr.className = 'purchase-item-row';
+    tr.innerHTML = `
+      <td>
+        <select class="form-select form-control-custom item-type" required>
+          <option value="生豆">生豆</option>
+          <option value="包材">包材</option>
+          <option value="耗材">耗材</option>
+          <option value="其他">其他</option>
+        </select>
+      </td>
+      <td><input type="text" class="form-control form-control-custom item-name" required placeholder="品項名稱"></td>
+      <td><input type="text" class="form-control form-control-custom item-batch bean-field" placeholder="批號"></td>
+      <td><input type="text" class="form-control form-control-custom item-origin bean-field" placeholder="產地"></td>
+      <td><input type="text" class="form-control form-control-custom item-process bean-field" placeholder="處理法"></td>
+      <td><input type="number" class="form-control form-control-custom item-quantity" step="0.01" min="0" required value="0"></td>
+      <td><input type="text" class="form-control form-control-custom item-unit" required value="kg"></td>
+      <td><input type="number" class="form-control form-control-custom item-price" step="0.01" min="0" required value="0"></td>
+      <td class="text-warning fw-bold item-subtotal">0</td>
+      <td><button type="button" class="btn btn-sm btn-outline-danger btn-remove-item"><i class="bi bi-trash"></i></button></td>
+    `;
+    
+    tbody.appendChild(tr);
+    
+    tr.querySelector('.item-type').addEventListener('change', (e) => {
+      const isBean = e.target.value === '生豆';
+      tr.querySelectorAll('.bean-field').forEach(el => {
+        el.disabled = !isBean;
+        if (!isBean) el.value = '';
+      });
+    });
+    
+    const calc = () => {
+      const q = parseFloat(tr.querySelector('.item-quantity').value) || 0;
+      const p = parseFloat(tr.querySelector('.item-price').value) || 0;
+      const sub = Math.round(q * p);
+      tr.querySelector('.item-subtotal').textContent = sub;
+      calcPurchaseTotal();
+    };
+    tr.querySelector('.item-quantity').addEventListener('input', calc);
+    tr.querySelector('.item-price').addEventListener('input', calc);
+    
+    tr.querySelector('.btn-remove-item').addEventListener('click', () => {
+      tr.remove();
+      calcPurchaseTotal();
+      if (tbody.children.length === 0) $('purchase-items-empty').classList.remove('d-none');
+    });
+  }
+
+  function calcPurchaseTotal() {
+    let total = 0;
+    document.querySelectorAll('.purchase-item-row').forEach(tr => {
+      total += parseInt(tr.querySelector('.item-subtotal').textContent, 10) || 0;
+    });
+    $('purchase-total-amount').textContent = total.toLocaleString();
+    return total;
+  }
+
+  async function savePurchase(e) {
+    e.preventDefault();
+    const form = $('purchase-form');
+    if (!form.checkValidity()) {
+      e.stopPropagation();
+      form.classList.add('was-validated');
+      return;
+    }
+    
+    const itemRows = document.querySelectorAll('.purchase-item-row');
+    if (itemRows.length === 0) {
+      showAlert('請至少新增一個進貨品項', 'warning');
+      return;
+    }
+
+    const items = [];
+    itemRows.forEach(tr => {
+      items.push({
+        item_type: tr.querySelector('.item-type').value,
+        item_name: tr.querySelector('.item-name').value.trim(),
+        batch_no: tr.querySelector('.item-batch').value.trim(),
+        origin: tr.querySelector('.item-origin').value.trim(),
+        process_method: tr.querySelector('.item-process').value.trim(),
+        quantity: parseFloat(tr.querySelector('.item-quantity').value) || 0,
+        unit: tr.querySelector('.item-unit').value.trim(),
+        unit_price: parseFloat(tr.querySelector('.item-price').value) || 0,
+        subtotal: parseFloat(tr.querySelector('.item-subtotal').textContent) || 0
+      });
+    });
+    
+    const supplierSelect = $('modal-purchase-supplier');
+    const supplier_name = supplierSelect.options[supplierSelect.selectedIndex].text;
+
+    const payload = {
+      supplier_id: supplierSelect.value,
+      supplier_name,
+      purchase_date: $('modal-purchase-date').value,
+      status: $('modal-purchase-status').value,
+      note: $('modal-purchase-note').value.trim(),
+      total_amount: calcPurchaseTotal(),
+      items
+    };
+
+    const btnText = $('btn-save-purchase-text');
+    const spinner = $('btn-save-purchase-spinner');
+    if (btnText) btnText.textContent = '處理中...';
+    if (spinner) spinner.classList.remove('d-none');
+
+    try {
+      await apiFetch('/api/purchases', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+      showAlert('進貨單建立成功！', 'success');
+      purchaseModalBS.hide();
+      loadPurchases();
+    } catch (err) {
+      showAlert(err.message, 'danger');
+    } finally {
+      if (btnText) btnText.textContent = '儲存進貨單';
+      if (spinner) spinner.classList.add('d-none');
+    }
+  }
+
+  if ($('btn-search-purchases')) $('btn-search-purchases').addEventListener('click', loadPurchases);
+  if ($('btn-add-purchase')) $('btn-add-purchase').addEventListener('click', openPurchaseModal);
+  if ($('btn-add-purchase-item')) $('btn-add-purchase-item').addEventListener('click', addPurchaseItemRow);
+  if ($('purchase-form')) $('purchase-form').addEventListener('submit', savePurchase);
+
+  // ════════════════════════════════════════════════════
   //  工具函式
   // ════════════════════════════════════════════════════
   function escHtml(str) {
@@ -1414,9 +1975,13 @@
     const productModalEl = $('product-modal');
     const deleteModalEl  = $('delete-modal');
     const roastModalEl   = $('roast-modal');
+    const supplierModalEl = $('supplier-modal');
+    const purchaseModalEl = $('purchase-modal');
     if (productModalEl) productModalBS = new bootstrap.Modal(productModalEl);
     if (deleteModalEl)  deleteModalBS  = new bootstrap.Modal(deleteModalEl);
     if (roastModalEl)   roastModalBS   = new bootstrap.Modal(roastModalEl);
+    if (supplierModalEl) supplierModalBS = new bootstrap.Modal(supplierModalEl);
+    if (purchaseModalEl) purchaseModalBS = new bootstrap.Modal(purchaseModalEl);
 
     initUserInfo();
     loadProducts(); // 預設顯示商品管理

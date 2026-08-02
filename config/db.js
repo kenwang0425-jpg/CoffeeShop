@@ -149,6 +149,25 @@ let mockBusinessHours = {
   ]
 };
 
+let mockSuppliers = [
+  {
+    id: 1,
+    name: '精選生豆貿易',
+    category: '生豆商',
+    contact_person: '王大明',
+    phone: '0912345678',
+    email: 'wang@example.com',
+    address_or_url: '台北市中山區...',
+    rating: 4,
+    evaluation_notes: '品質穩定，交期準確。',
+    status: 'active',
+    created_at: new Date(),
+    updated_at: new Date()
+  }
+];
+
+let mockPurchases = [];
+
 let pool = null;
 
 // 初始化資料庫
@@ -233,6 +252,48 @@ async function initializeDB() {
         DayOfWeek INT NOT NULL,
         StartTime VARCHAR(5) NOT NULL,
         EndTime VARCHAR(5) NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS suppliers (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        category VARCHAR(50) NOT NULL,
+        contact_person VARCHAR(50),
+        phone VARCHAR(30),
+        email VARCHAR(100),
+        address_or_url VARCHAR(255),
+        rating INT DEFAULT 3,
+        evaluation_notes TEXT,
+        status VARCHAR(20) DEFAULT 'active',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS purchases (
+        id VARCHAR(30) PRIMARY KEY,
+        supplier_id INT REFERENCES suppliers(id) ON DELETE SET NULL,
+        supplier_name VARCHAR(100),
+        purchase_date DATE NOT NULL,
+        total_amount NUMERIC(12,2) DEFAULT 0,
+        status VARCHAR(20) DEFAULT 'completed',
+        note TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS purchase_items (
+        id SERIAL PRIMARY KEY,
+        purchase_id VARCHAR(30) REFERENCES purchases(id) ON DELETE CASCADE,
+        item_type VARCHAR(30) NOT NULL,
+        item_name VARCHAR(255) NOT NULL,
+        batch_no VARCHAR(50) NULL,
+        origin VARCHAR(100) NULL,
+        process_method VARCHAR(50) NULL,
+        quantity NUMERIC(10,2) NOT NULL,
+        remaining_quantity NUMERIC(10,2) NOT NULL,
+        unit VARCHAR(20) NOT NULL,
+        unit_price NUMERIC(10,2) NOT NULL,
+        subtotal NUMERIC(12,2) NOT NULL
       );
     `;
     await pool.query(createTableQuery);
@@ -1145,6 +1206,312 @@ async function createOrder(orderData) {
   }
 }
 
+// ============================================================
+// 進貨商 Supplier 相關操作
+// ============================================================
+
+async function getSuppliers(category, keyword) {
+  if (pool) {
+    try {
+      let query = 'SELECT * FROM suppliers WHERE 1=1';
+      const params = [];
+      let paramIndex = 1;
+      
+      if (category && category !== 'all' && category !== '全部') {
+        query += ` AND category = $${paramIndex}`;
+        params.push(category);
+        paramIndex++;
+      }
+      
+      if (keyword) {
+        query += ` AND (name ILIKE $${paramIndex} OR contact_person ILIKE $${paramIndex})`;
+        params.push(`%${keyword}%`);
+        paramIndex++;
+      }
+      
+      query += ' ORDER BY created_at DESC';
+      const result = await pool.query(query, params);
+      return result.rows;
+    } catch (err) {
+      console.error('PostgreSQL getSuppliers 錯誤:', err.message);
+    }
+  }
+  
+  let result = [...mockSuppliers];
+  if (category && category !== 'all' && category !== '全部') {
+    result = result.filter(s => s.category === category);
+  }
+  if (keyword) {
+    const kw = keyword.toLowerCase();
+    result = result.filter(s => 
+      (s.name && s.name.toLowerCase().includes(kw)) || 
+      (s.contact_person && s.contact_person.toLowerCase().includes(kw))
+    );
+  }
+  return result;
+}
+
+async function getSupplierByID(id) {
+  if (pool) {
+    try {
+      const result = await pool.query('SELECT * FROM suppliers WHERE id = $1', [id]);
+      return result.rows[0] || null;
+    } catch (err) {
+      console.error('PostgreSQL getSupplierByID 錯誤:', err.message);
+    }
+  }
+  return mockSuppliers.find(s => String(s.id) === String(id)) || null;
+}
+
+async function addSupplier(data) {
+  if (pool) {
+    try {
+      const query = `
+        INSERT INTO suppliers 
+        (name, category, contact_person, phone, email, address_or_url, rating, evaluation_notes, status)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        RETURNING *
+      `;
+      const values = [
+        data.name, data.category, data.contact_person, data.phone,
+        data.email, data.address_or_url, data.rating || 3, data.evaluation_notes, data.status || 'active'
+      ];
+      const result = await pool.query(query, values);
+      return result.rows[0];
+    } catch (err) {
+      console.error('PostgreSQL addSupplier 錯誤:', err.message);
+    }
+  }
+  
+  const newSupplier = {
+    id: Date.now(), // mock id
+    ...data,
+    created_at: new Date(),
+    updated_at: new Date()
+  };
+  mockSuppliers.unshift(newSupplier);
+  return newSupplier;
+}
+
+async function updateSupplier(id, data) {
+  if (pool) {
+    try {
+      const query = `
+        UPDATE suppliers SET
+          name = $1, category = $2, contact_person = $3, phone = $4,
+          email = $5, address_or_url = $6, rating = $7, evaluation_notes = $8, status = $9,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = $10
+        RETURNING *
+      `;
+      const values = [
+        data.name, data.category, data.contact_person, data.phone,
+        data.email, data.address_or_url, data.rating, data.evaluation_notes, data.status,
+        id
+      ];
+      const result = await pool.query(query, values);
+      return result.rows[0];
+    } catch (err) {
+      console.error('PostgreSQL updateSupplier 錯誤:', err.message);
+    }
+  }
+  
+  const idx = mockSuppliers.findIndex(s => String(s.id) === String(id));
+  if (idx !== -1) {
+    mockSuppliers[idx] = { ...mockSuppliers[idx], ...data, updated_at: new Date() };
+    return mockSuppliers[idx];
+  }
+  return null;
+}
+
+async function deleteSupplier(id) {
+  if (pool) {
+    try {
+      const result = await pool.query('DELETE FROM suppliers WHERE id = $1', [id]);
+      return result.rowCount > 0;
+    } catch (err) {
+      console.error('PostgreSQL deleteSupplier 錯誤:', err.message);
+    }
+  }
+  
+  const initialLength = mockSuppliers.length;
+  mockSuppliers = mockSuppliers.filter(s => String(s.id) !== String(id));
+  return mockSuppliers.length < initialLength;
+}
+
+// ============================================================
+// 進貨管理 Purchase 相關操作
+// ============================================================
+
+async function getPurchases(startDate, endDate, supplierId) {
+  if (pool) {
+    try {
+      let query = 'SELECT * FROM purchases WHERE 1=1';
+      const params = [];
+      let paramIndex = 1;
+      
+      if (startDate) {
+        query += ` AND purchase_date >= $${paramIndex++}`;
+        params.push(startDate);
+      }
+      if (endDate) {
+        query += ` AND purchase_date <= $${paramIndex++}`;
+        params.push(endDate);
+      }
+      if (supplierId) {
+        query += ` AND supplier_id = $${paramIndex++}`;
+        params.push(supplierId);
+      }
+      
+      query += ' ORDER BY created_at DESC';
+      const result = await pool.query(query, params);
+      
+      // Fetch items for all purchases
+      const purchases = result.rows;
+      if (purchases.length > 0) {
+        const purchaseIds = purchases.map(p => p.id);
+        const itemsResult = await pool.query(
+          `SELECT * FROM purchase_items WHERE purchase_id = ANY($1)`,
+          [purchaseIds]
+        );
+        const itemsByPurchase = itemsResult.rows.reduce((acc, item) => {
+          if (!acc[item.purchase_id]) acc[item.purchase_id] = [];
+          acc[item.purchase_id].push(item);
+          return acc;
+        }, {});
+        
+        purchases.forEach(p => {
+          p.items = itemsByPurchase[p.id] || [];
+        });
+      }
+      
+      return purchases;
+    } catch (err) {
+      console.error('PostgreSQL getPurchases 錯誤:', err.message);
+    }
+  }
+  
+  // Mock fallback
+  let result = [...mockPurchases];
+  if (startDate) result = result.filter(p => p.purchase_date >= startDate);
+  if (endDate) result = result.filter(p => p.purchase_date <= endDate);
+  if (supplierId) result = result.filter(p => String(p.supplier_id) === String(supplierId));
+  return result;
+}
+
+async function getPurchaseByID(id) {
+  if (pool) {
+    try {
+      const result = await pool.query('SELECT * FROM purchases WHERE id = $1', [id]);
+      const purchase = result.rows[0];
+      if (purchase) {
+        const itemsResult = await pool.query('SELECT * FROM purchase_items WHERE purchase_id = $1', [id]);
+        purchase.items = itemsResult.rows;
+      }
+      return purchase || null;
+    } catch (err) {
+      console.error('PostgreSQL getPurchaseByID 錯誤:', err.message);
+    }
+  }
+  return mockPurchases.find(p => p.id === id) || null;
+}
+
+async function createPurchase(purchaseData) {
+  const { supplier_id, supplier_name, purchase_date, total_amount, status, note, items } = purchaseData;
+  const purchaseId = `PO${Date.now()}${Math.floor(Math.random() * 900 + 100)}`;
+  
+  if (pool) {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      
+      await client.query(
+        `INSERT INTO purchases (id, supplier_id, supplier_name, purchase_date, total_amount, status, note)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [purchaseId, supplier_id || null, supplier_name, purchase_date, total_amount, status || 'completed', note]
+      );
+      
+      if (Array.isArray(items) && items.length > 0) {
+        for (const item of items) {
+          await client.query(
+            `INSERT INTO purchase_items 
+             (purchase_id, item_type, item_name, batch_no, origin, process_method, quantity, remaining_quantity, unit, unit_price, subtotal)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+            [
+              purchaseId, item.item_type, item.item_name, item.batch_no || null,
+              item.origin || null, item.process_method || null, 
+              item.quantity, item.quantity, item.unit, item.unit_price, item.subtotal
+            ]
+          );
+        }
+      }
+      
+      await client.query('COMMIT');
+      return purchaseId;
+    } catch (err) {
+      await client.query('ROLLBACK');
+      console.error('PostgreSQL createPurchase 交易失敗，已 ROLLBACK:', err.message);
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+  
+  // Mock fallback
+  const itemsWithRemaining = (items || []).map((item, idx) => ({
+    id: Date.now() + idx,
+    purchase_id: purchaseId,
+    ...item,
+    remaining_quantity: item.quantity
+  }));
+  
+  const newPurchase = {
+    id: purchaseId,
+    supplier_id, supplier_name, purchase_date, total_amount, status: status || 'completed', note,
+    created_at: new Date(), updated_at: new Date(),
+    items: itemsWithRemaining
+  };
+  mockPurchases.unshift(newPurchase);
+  return purchaseId;
+}
+
+async function updatePurchaseStatus(id, status) {
+  if (pool) {
+    try {
+      const result = await pool.query(
+        'UPDATE purchases SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *',
+        [status, id]
+      );
+      return result.rows[0];
+    } catch (err) {
+      console.error('PostgreSQL updatePurchaseStatus 錯誤:', err.message);
+    }
+  }
+  
+  const idx = mockPurchases.findIndex(p => p.id === id);
+  if (idx !== -1) {
+    mockPurchases[idx].status = status;
+    mockPurchases[idx].updated_at = new Date();
+    return mockPurchases[idx];
+  }
+  return null;
+}
+
+async function deletePurchase(id) {
+  if (pool) {
+    try {
+      const result = await pool.query('DELETE FROM purchases WHERE id = $1', [id]);
+      return result.rowCount > 0;
+    } catch (err) {
+      console.error('PostgreSQL deletePurchase 錯誤:', err.message);
+    }
+  }
+  
+  const initialLength = mockPurchases.length;
+  mockPurchases = mockPurchases.filter(p => p.id !== id);
+  return mockPurchases.length < initialLength;
+}
+
 module.exports = {
   initializeDB,
   getProducts, getProductByID, isProductIDExists, addProduct, updateProduct, deleteProduct,
@@ -1152,5 +1519,7 @@ module.exports = {
   getBusinessHours, saveBusinessHours,
   getProductsByCategory, getCoffeeBeanFilters,
   getCustomerByPhone, getOrdersByPhone, createOrder,
-  getAdminOrders, updateOrderStatus
+  getAdminOrders, updateOrderStatus,
+  getSuppliers, getSupplierByID, addSupplier, updateSupplier, deleteSupplier,
+  getPurchases, getPurchaseByID, createPurchase, updatePurchaseStatus, deletePurchase
 };

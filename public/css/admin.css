@@ -1249,3 +1249,22 @@ body {
 
 /* 列印標題（螢幕不顯示）*/
 .roast-print-title { display: none; }
+
+/* ══════════════════════════════════════════
+   進貨商管理樣式
+══════════════════════════════════════════ */
+.supplier-rating-input {
+  display: flex;
+  gap: 0.3rem;
+  font-size: 1.25rem;
+  margin-top: 0.2rem;
+}
+
+.supplier-rating-input .star-select {
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.supplier-rating-input .star-select:hover {
+  transform: scale(1.15);
+}

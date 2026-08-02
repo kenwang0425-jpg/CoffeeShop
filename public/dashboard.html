@@ -43,6 +43,18 @@
             <span>📝 訂購方式管理</span>
           </a>
         </li>
+        <li class="menu-item" id="menu-suppliers">
+          <a href="#">
+            <i class="bi bi-truck"></i>
+            <span>進貨商管理</span>
+          </a>
+        </li>
+        <li class="menu-item" id="menu-purchases">
+          <a href="#">
+            <i class="bi bi-clipboard-check"></i>
+            <span>進貨管理</span>
+          </a>
+        </li>
         <li class="menu-item" id="menu-business-hours">
           <a href="#">
             <i class="bi bi-clock-fill"></i>
@@ -141,6 +153,127 @@
             </div>
           </div>
         </div> <!-- Closed section-products -->
+
+        <!-- ── 進貨商管理區塊 ── -->
+        <div id="section-suppliers" class="d-none">
+          <div class="glass-card">
+            <!-- 搜尋 & 新增 -->
+            <div class="row g-3 justify-content-between align-items-center mb-4">
+              <div class="col-12 col-md-4">
+                <div class="input-group">
+                  <span class="input-group-text bg-dark border-secondary text-secondary"><i
+                      class="bi bi-search"></i></span>
+                  <input type="text" class="form-control form-control-custom" id="supplier-search-input" placeholder="搜尋廠商名稱...">
+                </div>
+              </div>
+              <!-- 類別快速篩選 -->
+              <div class="col-12 col-md-auto d-flex gap-2 flex-wrap align-items-center">
+                <button class="btn btn-outline-warning btn-sm px-3 supplier-filter-tab active" data-cat="all">全部</button>
+                <button class="btn btn-outline-warning btn-sm px-3 supplier-filter-tab" data-cat="生豆商">生豆商</button>
+                <button class="btn btn-outline-warning btn-sm px-3 supplier-filter-tab" data-cat="包材商">包材商</button>
+                <button class="btn btn-outline-warning btn-sm px-3 supplier-filter-tab" data-cat="設備耗材商">設備耗材商</button>
+                <button class="btn btn-outline-warning btn-sm px-3 supplier-filter-tab" data-cat="其他">其他</button>
+                <button class="btn btn-custom-primary d-flex align-items-center gap-2" id="btn-add-supplier">
+                  <i class="bi bi-plus-circle-fill"></i><span>新增進貨商</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Loading -->
+            <div class="text-center py-5 d-none" id="supplier-loading-spinner">
+              <div class="spinner-border text-info" role="status" style="width:3rem;height:3rem;"></div>
+              <p class="text-secondary mt-3">正在載入進貨商資料...</p>
+            </div>
+
+            <!-- 進貨商列表表格 -->
+            <div class="table-responsive" id="supplier-table-container">
+              <table class="table custom-table">
+                <thead>
+                  <tr>
+                    <th style="width:15%">廠商名稱</th>
+                    <th style="width:10%">類別</th>
+                    <th style="width:15%">聯絡人與電話</th>
+                    <th style="width:20%">星級與評價</th>
+                    <th style="width:20%">聯絡地址/官網</th>
+                    <th style="width:8%">狀態</th>
+                    <th style="width:7%" class="text-center">操作</th>
+                  </tr>
+                </thead>
+                <tbody id="supplier-list-body"></tbody>
+              </table>
+            </div>
+
+            <!-- 無資料 -->
+            <div class="text-center py-5 d-none" id="supplier-empty-state">
+              <i class="bi bi-truck text-secondary mb-3" style="font-size:3.5rem;"></i>
+              <h5 class="text-secondary">目前沒有任何進貨商資料</h5>
+              <p class="text-muted">點選右上方「新增進貨商」按鈕來建立第一筆資料！</p>
+            </div>
+          </div>
+        </div> <!-- Closed section-suppliers -->
+
+        <!-- ── 進貨管理區塊 ── -->
+        <div id="section-purchases" class="d-none">
+          <div class="glass-card">
+            <!-- 篩選 & 新增 -->
+            <div class="row g-3 align-items-end mb-4">
+              <div class="col-12 col-md-3">
+                <label class="form-label text-muted fs-7 mb-1">起始日期</label>
+                <input type="date" class="form-control form-control-custom" id="purchase-start-date">
+              </div>
+              <div class="col-12 col-md-3">
+                <label class="form-label text-muted fs-7 mb-1">結束日期</label>
+                <input type="date" class="form-control form-control-custom" id="purchase-end-date">
+              </div>
+              <div class="col-12 col-md-3">
+                <label class="form-label text-muted fs-7 mb-1">進貨商篩選</label>
+                <select class="form-select form-control-custom" id="purchase-supplier-filter">
+                  <option value="">全部進貨商</option>
+                </select>
+              </div>
+              <div class="col-12 col-md-3 text-md-end">
+                <button class="btn btn-outline-info me-2" id="btn-search-purchases">
+                  <i class="bi bi-search"></i> 查詢
+                </button>
+                <button class="btn btn-custom-primary" id="btn-add-purchase">
+                  <i class="bi bi-plus-circle-fill"></i><span> 建立進貨單</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Loading -->
+            <div class="text-center py-5 d-none" id="purchase-loading-spinner">
+              <div class="spinner-border text-info" role="status" style="width:3rem;height:3rem;"></div>
+              <p class="text-secondary mt-3">正在載入進貨單...</p>
+            </div>
+
+            <!-- 進貨單列表表格 -->
+            <div class="table-responsive" id="purchase-table-container">
+              <table class="table custom-table">
+                <thead>
+                  <tr>
+                    <th style="width:15%">進貨單號</th>
+                    <th style="width:12%">進貨日期</th>
+                    <th style="width:18%">進貨商名稱</th>
+                    <th style="width:20%">物料類型摘要</th>
+                    <th style="width:10%">總品項數</th>
+                    <th style="width:10%">總金額</th>
+                    <th style="width:8%">狀態</th>
+                    <th style="width:7%" class="text-center">操作</th>
+                  </tr>
+                </thead>
+                <tbody id="purchase-list-body"></tbody>
+              </table>
+            </div>
+
+            <!-- 無資料 -->
+            <div class="text-center py-5 d-none" id="purchase-empty-state">
+              <i class="bi bi-clipboard-x text-secondary mb-3" style="font-size:3.5rem;"></i>
+              <h5 class="text-secondary">查無進貨單資料</h5>
+              <p class="text-muted">點選「建立進貨單」來新增第一筆進貨記錄。</p>
+            </div>
+          </div>
+        </div> <!-- Closed section-purchases -->
 
         <!-- ── 訂購方式管理區塊 ── -->
         <div id="section-ordering" class="d-none">
@@ -523,6 +656,198 @@
             <i class="bi bi-printer-fill me-2"></i>🖨️ 列印備料單
           </button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 新增/修改進貨商 Modal ===== -->
+  <div class="modal fade" id="supplier-modal" data-bs-backdrop="static" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content modal-content-custom">
+        <div class="modal-header modal-header-custom">
+          <h5 class="modal-title modal-title-custom" id="supplier-modal-title">新增進貨商</h5>
+          <button type="button" class="btn-close btn-close-white-custom" data-bs-dismiss="modal"
+            aria-label="Close"></button>
+        </div>
+        <form id="supplier-form" novalidate>
+          <div class="modal-body p-4">
+            <div class="row g-3 mb-3">
+              <div class="col-12 col-md-6">
+                <label for="supplier-name" class="form-label form-label-custom">廠商名稱 <span
+                    class="text-danger">*</span></label>
+                <input type="text" class="form-control form-control-custom" id="supplier-name" required>
+                <div class="invalid-feedback-custom" id="supplier-name-feedback">廠商名稱為必填。</div>
+              </div>
+              <div class="col-12 col-md-6">
+                <label for="supplier-category" class="form-label form-label-custom">供應類型 <span
+                    class="text-danger">*</span></label>
+                <select class="form-select form-control-custom" id="supplier-category" required>
+                  <option value="">── 請選擇類別 ──</option>
+                  <option value="生豆商">生豆商</option>
+                  <option value="包材商">包材商</option>
+                  <option value="設備耗材商">設備耗材商</option>
+                  <option value="其他">其他</option>
+                </select>
+                <div class="invalid-feedback-custom" id="supplier-category-feedback">請選擇供應類型。</div>
+              </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+              <div class="col-12 col-md-6">
+                <label for="supplier-contact" class="form-label form-label-custom">聯絡人</label>
+                <input type="text" class="form-control form-control-custom" id="supplier-contact">
+              </div>
+              <div class="col-12 col-md-6">
+                <label for="supplier-phone" class="form-label form-label-custom">聯絡電話</label>
+                <input type="text" class="form-control form-control-custom" id="supplier-phone">
+              </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+              <div class="col-12 col-md-6">
+                <label for="supplier-email" class="form-label form-label-custom">電子郵件</label>
+                <input type="email" class="form-control form-control-custom" id="supplier-email">
+              </div>
+              <div class="col-12 col-md-6">
+                <label for="supplier-address-url" class="form-label form-label-custom">地址或官網/賣場連結</label>
+                <input type="text" class="form-control form-control-custom" id="supplier-address-url">
+              </div>
+            </div>
+
+            <hr class="border-secondary my-3">
+            <p class="text-info fs-8 mb-2 fw-bold text-uppercase tracking-wider"><i
+                class="bi bi-star-fill me-1"></i>評鑑與狀態</p>
+                
+            <div class="row g-3 mb-3">
+              <div class="col-12 col-md-6">
+                <label class="form-label form-label-custom d-block">星級評鑑</label>
+                <div class="supplier-rating-input" id="supplier-rating-input">
+                  <i class="bi bi-star-fill text-warning star-select" data-val="1"></i>
+                  <i class="bi bi-star-fill text-warning star-select" data-val="2"></i>
+                  <i class="bi bi-star-fill text-warning star-select" data-val="3"></i>
+                  <i class="bi bi-star text-warning star-select" data-val="4"></i>
+                  <i class="bi bi-star text-warning star-select" data-val="5"></i>
+                </div>
+                <input type="hidden" id="supplier-rating" value="3">
+              </div>
+              <div class="col-12 col-md-6">
+                <label for="supplier-status" class="form-label form-label-custom">合作狀態</label>
+                <select class="form-select form-control-custom" id="supplier-status">
+                  <option value="active">合作中</option>
+                  <option value="inactive">暫停合作</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label for="supplier-notes" class="form-label form-label-custom">自我評價與備註</label>
+              <textarea class="form-control form-control-custom" id="supplier-notes" rows="3"
+                placeholder="輸入對於此進貨商的評價備註..."></textarea>
+            </div>
+
+          </div>
+          <div class="modal-footer modal-footer-custom">
+            <button type="button" class="btn btn-outline-secondary px-4" data-bs-dismiss="modal">取消</button>
+            <button type="submit" class="btn btn-custom-primary px-4" id="btn-save-supplier">
+              <span id="btn-save-supplier-text">儲存</span>
+              <span id="btn-save-supplier-spinner" class="spinner-border spinner-border-sm d-none" role="status"
+                aria-hidden="true"></span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 建立/編輯進貨單 Modal ===== -->
+  <div class="modal fade" id="purchase-modal" data-bs-backdrop="static" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+      <div class="modal-content modal-content-custom">
+        <div class="modal-header modal-header-custom">
+          <h5 class="modal-title modal-title-custom" id="purchase-modal-title">新增進貨單</h5>
+          <button type="button" class="btn-close btn-close-white-custom" data-bs-dismiss="modal"
+            aria-label="Close"></button>
+        </div>
+        <form id="purchase-form" novalidate>
+          <div class="modal-body p-4">
+            
+            <!-- 單頭資訊 -->
+            <h6 class="text-info mb-3 fw-bold border-bottom border-secondary pb-2">單據資訊</h6>
+            <div class="row g-3 mb-4">
+              <div class="col-12 col-md-3">
+                <label class="form-label form-label-custom">選擇進貨商 <span class="text-danger">*</span></label>
+                <select class="form-select form-control-custom" id="modal-purchase-supplier" required>
+                  <option value="">── 請選擇進貨商 ──</option>
+                </select>
+                <div class="invalid-feedback-custom">請選擇進貨商。</div>
+              </div>
+              <div class="col-12 col-md-3">
+                <label class="form-label form-label-custom">進貨日期 <span class="text-danger">*</span></label>
+                <input type="date" class="form-control form-control-custom" id="modal-purchase-date" required>
+                <div class="invalid-feedback-custom">進貨日期為必填。</div>
+              </div>
+              <div class="col-12 col-md-3">
+                <label class="form-label form-label-custom">狀態 <span class="text-danger">*</span></label>
+                <select class="form-select form-control-custom" id="modal-purchase-status" required>
+                  <option value="completed">已入庫</option>
+                  <option value="pending">待到貨</option>
+                </select>
+              </div>
+              <div class="col-12 col-md-3">
+                <label class="form-label form-label-custom">備註</label>
+                <input type="text" class="form-control form-control-custom" id="modal-purchase-note" placeholder="進貨單備註...">
+              </div>
+            </div>
+
+            <!-- 明細區 -->
+            <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-secondary pb-2">
+              <h6 class="text-info fw-bold mb-0">進貨明細清單</h6>
+              <button type="button" class="btn btn-sm btn-outline-warning" id="btn-add-purchase-item">
+                <i class="bi bi-plus-lg"></i> 新增品項
+              </button>
+            </div>
+            
+            <div class="table-responsive mb-3" style="min-height: 200px;">
+              <table class="table custom-table table-sm align-middle" id="purchase-items-table">
+                <thead>
+                  <tr>
+                    <th style="width: 10%">類型</th>
+                    <th style="width: 15%">品項名稱</th>
+                    <th style="width: 12%" class="bean-only-header">批號/產季</th>
+                    <th style="width: 12%" class="bean-only-header">產地</th>
+                    <th style="width: 12%" class="bean-only-header">處理法</th>
+                    <th style="width: 8%">數量</th>
+                    <th style="width: 8%">單位</th>
+                    <th style="width: 8%">單價</th>
+                    <th style="width: 10%">小計</th>
+                    <th style="width: 5%">操作</th>
+                  </tr>
+                </thead>
+                <tbody id="purchase-items-body">
+                  <!-- JS dynamically fills this -->
+                </tbody>
+              </table>
+              <div class="text-center p-3 text-muted d-none" id="purchase-items-empty">
+                請點擊右上角「新增品項」以添加進貨明細
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="col-12 text-end">
+                <h4 class="text-warning mb-0">總金額：$<span id="purchase-total-amount">0</span></h4>
+              </div>
+            </div>
+
+          </div>
+          <div class="modal-footer modal-footer-custom">
+            <button type="button" class="btn btn-outline-secondary px-4" data-bs-dismiss="modal">取消</button>
+            <button type="submit" class="btn btn-custom-primary px-4" id="btn-save-purchase">
+              <span id="btn-save-purchase-text">儲存進貨單</span>
+              <span id="btn-save-purchase-spinner" class="spinner-border spinner-border-sm d-none" role="status"
+                aria-hidden="true"></span>
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   </div>

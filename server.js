@@ -33,6 +33,8 @@ const adminRoutes = require('./routes/admin');
 const storefrontRoutes = require('./routes/storefront');
 const customerRoutes = require('./routes/customers');
 const orderRoutes = require('./routes/orders');
+const supplierRoutes = require('./routes/suppliers');
+const purchaseRoutes = require('./routes/purchases');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
@@ -40,6 +42,8 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/storefront', storefrontRoutes);
 app.use('/api/customers', customerRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/suppliers', supplierRoutes);
+app.use('/api/purchases', purchaseRoutes);
 
 // 預設路由重導向 (首頁即登入頁)
 app.get('/', (req, res) => {
