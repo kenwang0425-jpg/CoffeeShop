@@ -163,10 +163,68 @@ let mockSuppliers = [
     status: 'active',
     created_at: new Date(),
     updated_at: new Date()
+  },
+  {
+    id: 2,
+    name: '豐潤生豆',
+    category: '生豆商',
+    contact_person: '陳先生',
+    phone: '0988111222',
+    email: 'fengrun@example.com',
+    address_or_url: '台北市信義區...',
+    rating: 5,
+    evaluation_notes: '生豆品質極佳，批次齊全。',
+    status: 'active',
+    created_at: new Date(),
+    updated_at: new Date()
+  },
+  {
+    id: 3,
+    name: '佳廣包裝',
+    category: '包材商',
+    contact_person: '林小姐',
+    phone: '0977333444',
+    email: 'jiaguang@example.com',
+    address_or_url: '新北市三重區...',
+    rating: 4,
+    evaluation_notes: '交期穩定，價格合理。',
+    status: 'active',
+    created_at: new Date(),
+    updated_at: new Date()
   }
 ];
 
-let mockPurchases = [];
+let mockPurchases = [
+  {
+    id: 'PO20260803123',
+    supplier_id: 2,
+    supplier_name: '豐潤生豆',
+    purchase_date: '2026-08-01',
+    total_amount: 9000,
+    status: 'completed',
+    note: '測試種子生豆進貨單',
+    created_at: new Date(),
+    updated_at: new Date(),
+    items: [
+      { id: 101, purchase_id: 'PO20260803123', item_type: '生豆', item_name: '耶加雪菲 歌迪貝', batch_no: 'C192', origin: '衣索比亞', process_method: '日曬', quantity: 20, remaining_quantity: 20, unit: 'kg', unit_price: 450, subtotal: 9000 }
+    ]
+  },
+  {
+    id: 'PO20260803124',
+    supplier_id: 3,
+    supplier_name: '佳廣包裝',
+    purchase_date: '2026-08-02',
+    total_amount: 6400,
+    status: 'completed',
+    note: '測試種子包材進貨單',
+    created_at: new Date(),
+    updated_at: new Date(),
+    items: [
+      { id: 102, purchase_id: 'PO20260803124', item_type: '包材', item_name: '半磅咖啡袋', batch_no: null, origin: null, process_method: null, quantity: 500, remaining_quantity: 500, unit: '個', unit_price: 8, subtotal: 4000 },
+      { id: 103, purchase_id: 'PO20260803124', item_type: '包材', item_name: '耳掛外盒', batch_no: null, origin: null, process_method: null, quantity: 200, remaining_quantity: 200, unit: '個', unit_price: 12, subtotal: 2400 }
+    ]
+  }
+];
 
 let pool = null;
 
@@ -372,6 +430,37 @@ async function initializeDB() {
         SELECT '17:00', '21:00'
       ) AS s
       WHERE NOT EXISTS (SELECT 1 FROM BusinessHourSlots);
+
+      -- 4. 寫入進貨商預設資料
+      INSERT INTO suppliers (id, name, category, contact_person, phone, email, address_or_url, rating, evaluation_notes, status)
+      VALUES 
+      (1, '精選生豆貿易', '生豆商', '王大明', '0912345678', 'wang@example.com', '台北市中山區...', 4, '品質穩定，交期準確。', 'active'),
+      (2, '豐潤生豆', '生豆商', '陳先生', '0988111222', 'fengrun@example.com', '台北市信義區...', 5, '生豆品質極佳，批次齊全。', 'active'),
+      (3, '佳廣包裝', '包材商', '林小姐', '0977333444', 'jiaguang@example.com', '新北市三重區...', 4, '交期穩定，價格合理。', 'active')
+      ON CONFLICT (id) DO UPDATE SET 
+        name = EXCLUDED.name, category = EXCLUDED.category;
+
+      -- 修復 suppliers 表的 SERIAL sequence，避免後續 INSERT 發生 duplicate key 錯誤
+      SELECT setval('suppliers_id_seq', (SELECT MAX(id) FROM suppliers));
+
+      -- 5. 寫入進貨單預設資料
+      INSERT INTO purchases (id, supplier_id, supplier_name, purchase_date, total_amount, status, note)
+      VALUES
+      ('PO20260803123', 2, '豐潤生豆', '2026-08-01', 9000, 'completed', '測試種子生豆進貨單'),
+      ('PO20260803124', 3, '佳廣包裝', '2026-08-02', 6400, 'completed', '測試種子包材進貨單')
+      ON CONFLICT (id) DO NOTHING;
+
+      INSERT INTO purchase_items (purchase_id, item_type, item_name, batch_no, origin, process_method, quantity, remaining_quantity, unit, unit_price, subtotal)
+      SELECT 'PO20260803123', '生豆', '耶加雪菲 歌迪貝', 'C192', '衣索比亞', '日曬', 20, 20, 'kg', 450, 9000
+      WHERE NOT EXISTS (SELECT 1 FROM purchase_items WHERE purchase_id = 'PO20260803123');
+
+      INSERT INTO purchase_items (purchase_id, item_type, item_name, batch_no, origin, process_method, quantity, remaining_quantity, unit, unit_price, subtotal)
+      SELECT 'PO20260803124', '包材', '半磅咖啡袋', NULL, NULL, NULL, 500, 500, '個', 8, 4000
+      WHERE NOT EXISTS (SELECT 1 FROM purchase_items WHERE purchase_id = 'PO20260803124' AND item_name = '半磅咖啡袋');
+
+      INSERT INTO purchase_items (purchase_id, item_type, item_name, batch_no, origin, process_method, quantity, remaining_quantity, unit, unit_price, subtotal)
+      SELECT 'PO20260803124', '包材', '耳掛外盒', NULL, NULL, NULL, 200, 200, '個', 12, 2400
+      WHERE NOT EXISTS (SELECT 1 FROM purchase_items WHERE purchase_id = 'PO20260803124' AND item_name = '耳掛外盒');
     `;
     await pool.query(initDataQuery);
 
@@ -1346,16 +1435,16 @@ async function deleteSupplier(id) {
 async function getPurchases(startDate, endDate, supplierId) {
   if (pool) {
     try {
-      let query = 'SELECT * FROM purchases WHERE 1=1';
+      let query = "SELECT *, to_char(purchase_date, 'YYYY-MM-DD') AS purchase_date FROM purchases WHERE 1=1";
       const params = [];
       let paramIndex = 1;
       
       if (startDate) {
-        query += ` AND purchase_date >= $${paramIndex++}`;
+        query += ` AND purchase_date::date >= $${paramIndex++}::date`;
         params.push(startDate);
       }
       if (endDate) {
-        query += ` AND purchase_date <= $${paramIndex++}`;
+        query += ` AND purchase_date::date <= $${paramIndex++}::date`;
         params.push(endDate);
       }
       if (supplierId) {
@@ -1394,7 +1483,7 @@ async function getPurchases(startDate, endDate, supplierId) {
   // Mock fallback
   let result = [...mockPurchases];
   if (startDate) result = result.filter(p => p.purchase_date >= startDate);
-  if (endDate) result = result.filter(p => p.purchase_date <= endDate);
+  if (endDate) result = result.filter(p => p.purchase_date <= endDate + ' 23:59:59');
   if (supplierId) result = result.filter(p => String(p.supplier_id) === String(supplierId));
   return result;
 }
@@ -1402,7 +1491,7 @@ async function getPurchases(startDate, endDate, supplierId) {
 async function getPurchaseByID(id) {
   if (pool) {
     try {
-      const result = await pool.query('SELECT * FROM purchases WHERE id = $1', [id]);
+      const result = await pool.query("SELECT *, to_char(purchase_date, 'YYYY-MM-DD') AS purchase_date FROM purchases WHERE id = $1", [id]);
       const purchase = result.rows[0];
       if (purchase) {
         const itemsResult = await pool.query('SELECT * FROM purchase_items WHERE purchase_id = $1', [id]);

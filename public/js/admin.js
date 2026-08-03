@@ -220,6 +220,25 @@
       if (sectionPurchases) sectionPurchases.classList.remove('d-none');
       if (menuPurchases) menuPurchases.classList.add('active');
       if (pageTitle) pageTitle.textContent = '進貨管理';
+      
+      const sdInput = $('purchase-start-date');
+      const edInput = $('purchase-end-date');
+      const supInput = $('purchase-supplier-filter');
+      
+      if (sdInput && edInput && !sdInput.value && !edInput.value) {
+        const now = new Date();
+        const y = now.getFullYear();
+        const m = String(now.getMonth() + 1).padStart(2, '0');
+        const firstDay = `${y}-${m}-01`;
+        
+        const lastDayObj = new Date(y, now.getMonth() + 1, 0);
+        const lastDay = `${y}-${m}-${String(lastDayObj.getDate()).padStart(2, '0')}`;
+        
+        sdInput.value = firstDay;
+        edInput.value = lastDay;
+      }
+      if (supInput) supInput.value = '';
+      
       loadPurchases();
     }
   }
@@ -1748,6 +1767,9 @@
         <td class="align-middle text-warning fw-bold">$${totalAmount}</td>
         <td class="align-middle">${statusBadge}</td>
         <td class="align-middle text-center">
+          <button class="btn btn-sm btn-outline-primary me-1 btn-view-purchase" data-id="${p.id}" title="檢視明細">
+            <i class="bi bi-eye-fill"></i>
+          </button>
           <button class="btn btn-sm btn-outline-info me-1 btn-toggle-purchase-status" data-id="${p.id}" data-status="${p.status}" title="切換狀態">
             <i class="bi bi-arrow-repeat"></i>
           </button>
@@ -1757,6 +1779,13 @@
         </td>
       `;
       tbody.appendChild(tr);
+    });
+
+    document.querySelectorAll('.btn-view-purchase').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const id = e.currentTarget.getAttribute('data-id');
+        openViewPurchaseModal(id);
+      });
     });
 
     document.querySelectorAll('.btn-toggle-purchase-status').forEach(btn => {
@@ -1817,6 +1846,17 @@
     form.reset();
     form.classList.remove('was-validated');
     
+    // Reset view mode states
+    const btnSave = $('btn-save-purchase');
+    const btnAdd = $('btn-add-purchase-item');
+    if (btnSave) btnSave.classList.remove('d-none');
+    if (btnAdd) btnAdd.classList.remove('d-none');
+    $('purchase-modal-title').textContent = '新增進貨單';
+    
+    // Re-enable inputs
+    const inputs = form.querySelectorAll('input, select');
+    inputs.forEach(el => el.disabled = false);
+
     const today = new Date().toISOString().substring(0, 10);
     if ($('modal-purchase-date')) $('modal-purchase-date').value = today;
     
@@ -1828,28 +1868,82 @@
     purchaseModalBS.show();
   }
 
-  function addPurchaseItemRow() {
+  async function openViewPurchaseModal(id) {
+    const form = $('purchase-form');
+    if (!form || !purchaseModalBS) return;
+
+    form.reset();
+    form.classList.remove('was-validated');
+    $('purchase-items-body').innerHTML = '';
+    $('purchase-items-empty').classList.add('d-none');
+    
+    // Hide save button and add item button for view mode
+    const btnSave = $('btn-save-purchase');
+    const btnAdd = $('btn-add-purchase-item');
+    if (btnSave) btnSave.classList.add('d-none');
+    if (btnAdd) btnAdd.classList.add('d-none');
+    $('purchase-modal-title').innerHTML = `<i class="bi bi-eye me-2"></i>檢視進貨單 - ${escHtml(id)}`;
+
+    await loadSupplierOptions();
+    
+    try {
+      const res = await apiFetch(`/api/purchases/${id}`);
+      const p = res.data;
+      
+      if ($('modal-purchase-supplier')) $('modal-purchase-supplier').value = p.supplier_id || '';
+      if ($('modal-purchase-date')) $('modal-purchase-date').value = p.purchase_date.substring(0, 10);
+      if ($('modal-purchase-status')) $('modal-purchase-status').value = p.status;
+      if ($('modal-purchase-note')) $('modal-purchase-note').value = p.note || '';
+
+      if (p.items && p.items.length > 0) {
+        p.items.forEach(item => {
+          addPurchaseItemRow(item);
+        });
+      } else {
+        $('purchase-items-empty').classList.remove('d-none');
+      }
+      
+      // Make all inputs and remove buttons disabled for view mode
+      const inputs = form.querySelectorAll('input, select, button.btn-remove-item');
+      inputs.forEach(el => el.disabled = true);
+      
+      purchaseModalBS.show();
+    } catch(err) {
+      showAlert('無法載入進貨單資料：' + err.message, 'danger');
+    }
+  }
+
+  function addPurchaseItemRow(itemData = null) {
+    // If called directly from an event listener, itemData will be the Event object
+    if (itemData && itemData instanceof Event) {
+      itemData = null;
+    }
+    
     $('purchase-items-empty').classList.add('d-none');
     const tbody = $('purchase-items-body');
     const tr = document.createElement('tr');
     tr.className = 'purchase-item-row';
+    
+    const isBean = itemData ? (itemData.item_type === '生豆') : true;
+    const itemType = itemData ? escHtml(itemData.item_type) : '生豆';
+    
     tr.innerHTML = `
       <td>
         <select class="form-select form-control-custom item-type" required>
-          <option value="生豆">生豆</option>
-          <option value="包材">包材</option>
-          <option value="耗材">耗材</option>
-          <option value="其他">其他</option>
+          <option value="生豆" ${itemType === '生豆' ? 'selected' : ''}>生豆</option>
+          <option value="包材" ${itemType === '包材' ? 'selected' : ''}>包材</option>
+          <option value="耗材" ${itemType === '耗材' ? 'selected' : ''}>耗材</option>
+          <option value="其他" ${itemType === '其他' ? 'selected' : ''}>其他</option>
         </select>
       </td>
-      <td><input type="text" class="form-control form-control-custom item-name" required placeholder="品項名稱"></td>
-      <td><input type="text" class="form-control form-control-custom item-batch bean-field" placeholder="批號"></td>
-      <td><input type="text" class="form-control form-control-custom item-origin bean-field" placeholder="產地"></td>
-      <td><input type="text" class="form-control form-control-custom item-process bean-field" placeholder="處理法"></td>
-      <td><input type="number" class="form-control form-control-custom item-quantity" step="0.01" min="0" required value="0"></td>
-      <td><input type="text" class="form-control form-control-custom item-unit" required value="kg"></td>
-      <td><input type="number" class="form-control form-control-custom item-price" step="0.01" min="0" required value="0"></td>
-      <td class="text-warning fw-bold item-subtotal">0</td>
+      <td><input type="text" class="form-control form-control-custom item-name" required placeholder="品項名稱" value="${itemData ? escHtml(itemData.item_name) : ''}"></td>
+      <td><input type="text" class="form-control form-control-custom item-batch bean-field" placeholder="批號" value="${itemData && itemData.batch_no ? escHtml(itemData.batch_no) : ''}" ${!isBean ? 'disabled' : ''}></td>
+      <td><input type="text" class="form-control form-control-custom item-origin bean-field" placeholder="產地" value="${itemData && itemData.origin ? escHtml(itemData.origin) : ''}" ${!isBean ? 'disabled' : ''}></td>
+      <td><input type="text" class="form-control form-control-custom item-process bean-field" placeholder="處理法" value="${itemData && itemData.process_method ? escHtml(itemData.process_method) : ''}" ${!isBean ? 'disabled' : ''}></td>
+      <td><input type="number" class="form-control form-control-custom item-quantity" step="0.01" min="0" required value="${itemData ? itemData.quantity : 0}"></td>
+      <td><input type="text" class="form-control form-control-custom item-unit" required value="${itemData ? escHtml(itemData.unit) : 'kg'}"></td>
+      <td><input type="number" class="form-control form-control-custom item-price" step="0.01" min="0" required value="${itemData ? itemData.unit_price : 0}"></td>
+      <td class="text-warning fw-bold item-subtotal">${itemData ? '$' + itemData.subtotal : '$0'}</td>
       <td><button type="button" class="btn btn-sm btn-outline-danger btn-remove-item"><i class="bi bi-trash"></i></button></td>
     `;
     
@@ -1863,15 +1957,20 @@
       });
     });
     
+    // 初始化時手動觸發一次，確保欄位鎖定狀態與選單預設值完全同步
+    tr.querySelector('.item-type').dispatchEvent(new Event('change'));
+    
     const calc = () => {
       const q = parseFloat(tr.querySelector('.item-quantity').value) || 0;
       const p = parseFloat(tr.querySelector('.item-price').value) || 0;
       const sub = Math.round(q * p);
-      tr.querySelector('.item-subtotal').textContent = sub;
+      tr.querySelector('.item-subtotal').textContent = '$' + sub;
       calcPurchaseTotal();
     };
     tr.querySelector('.item-quantity').addEventListener('input', calc);
     tr.querySelector('.item-price').addEventListener('input', calc);
+    
+    if (itemData) calcPurchaseTotal();
     
     tr.querySelector('.btn-remove-item').addEventListener('click', () => {
       tr.remove();
@@ -1883,7 +1982,8 @@
   function calcPurchaseTotal() {
     let total = 0;
     document.querySelectorAll('.purchase-item-row').forEach(tr => {
-      total += parseInt(tr.querySelector('.item-subtotal').textContent, 10) || 0;
+      const text = tr.querySelector('.item-subtotal').textContent.replace('$', '');
+      total += parseInt(text, 10) || 0;
     });
     $('purchase-total-amount').textContent = total.toLocaleString();
     return total;
@@ -1915,7 +2015,7 @@
         quantity: parseFloat(tr.querySelector('.item-quantity').value) || 0,
         unit: tr.querySelector('.item-unit').value.trim(),
         unit_price: parseFloat(tr.querySelector('.item-price').value) || 0,
-        subtotal: parseFloat(tr.querySelector('.item-subtotal').textContent) || 0
+        subtotal: parseFloat(tr.querySelector('.item-subtotal').textContent.replace('$', '')) || 0
       });
     });
     
@@ -1954,6 +2054,14 @@
   }
 
   if ($('btn-search-purchases')) $('btn-search-purchases').addEventListener('click', loadPurchases);
+  if ($('btn-clear-purchase-dates')) {
+    $('btn-clear-purchase-dates').addEventListener('click', () => {
+      if ($('purchase-start-date')) $('purchase-start-date').value = '';
+      if ($('purchase-end-date')) $('purchase-end-date').value = '';
+      if ($('purchase-supplier-filter')) $('purchase-supplier-filter').value = '';
+      loadPurchases();
+    });
+  }
   if ($('btn-add-purchase')) $('btn-add-purchase').addEventListener('click', openPurchaseModal);
   if ($('btn-add-purchase-item')) $('btn-add-purchase-item').addEventListener('click', addPurchaseItemRow);
   if ($('purchase-form')) $('purchase-form').addEventListener('submit', savePurchase);
@@ -1996,5 +2104,18 @@
     init();
 
   }
+
+  // 日期輸入框點擊自動展開月曆
+  document.addEventListener('click', (e) => {
+    if (e.target && e.target.type === 'date') {
+      if (typeof e.target.showPicker === 'function') {
+        try {
+          e.target.showPicker();
+        } catch (err) {
+          // Ignore error (e.g. if picker is already showing)
+        }
+      }
+    }
+  });
 
 })();

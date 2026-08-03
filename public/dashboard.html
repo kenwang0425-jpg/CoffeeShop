@@ -231,12 +231,15 @@
                   <option value="">全部進貨商</option>
                 </select>
               </div>
-              <div class="col-12 col-md-3 text-md-end">
+              <div class="col-12 col-md-auto d-flex align-items-end">
+                <button class="btn btn-outline-secondary me-2" id="btn-clear-purchase-dates" title="清除日期">
+                  <i class="bi bi-x-circle"></i> 清除
+                </button>
                 <button class="btn btn-outline-info me-2" id="btn-search-purchases">
                   <i class="bi bi-search"></i> 查詢
                 </button>
                 <button class="btn btn-custom-primary" id="btn-add-purchase">
-                  <i class="bi bi-plus-circle-fill"></i><span> 建立進貨單</span>
+                  <i class="bi bi-plus-circle-fill"></i><span> 新增</span>
                 </button>
               </div>
             </div>
@@ -761,7 +764,7 @@
 
   <!-- ===== 建立/編輯進貨單 Modal ===== -->
   <div class="modal fade" id="purchase-modal" data-bs-backdrop="static" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-xl">
+    <div class="modal-dialog modal-dialog-centered modal-xl" style="max-width: 1200px; width: 95%;">
       <div class="modal-content modal-content-custom">
         <div class="modal-header modal-header-custom">
           <h5 class="modal-title modal-title-custom" id="purchase-modal-title">新增進貨單</h5>
@@ -811,16 +814,16 @@
               <table class="table custom-table table-sm align-middle" id="purchase-items-table">
                 <thead>
                   <tr>
-                    <th style="width: 10%">類型</th>
-                    <th style="width: 15%">品項名稱</th>
-                    <th style="width: 12%" class="bean-only-header">批號/產季</th>
-                    <th style="width: 12%" class="bean-only-header">產地</th>
-                    <th style="width: 12%" class="bean-only-header">處理法</th>
-                    <th style="width: 8%">數量</th>
-                    <th style="width: 8%">單位</th>
-                    <th style="width: 8%">單價</th>
-                    <th style="width: 10%">小計</th>
-                    <th style="width: 5%">操作</th>
+                    <th style="min-width: 90px">類型</th>
+                    <th style="min-width: 160px">品項名稱</th>
+                    <th style="min-width: 130px" class="bean-only-header">批號/產季</th>
+                    <th style="min-width: 130px" class="bean-only-header">產地</th>
+                    <th style="min-width: 130px" class="bean-only-header">處理法</th>
+                    <th style="min-width: 80px">數量</th>
+                    <th style="min-width: 60px">單位</th>
+                    <th style="min-width: 90px">單價</th>
+                    <th style="min-width: 100px">小計</th>
+                    <th style="min-width: 50px">操作</th>
                   </tr>
                 </thead>
                 <tbody id="purchase-items-body">
