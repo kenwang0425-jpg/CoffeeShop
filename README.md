@@ -310,4 +310,36 @@ PostgreSQL 預設外部 Port 為 5432。若 NAS 上已部署其他服務（如 I
 >
 > **3. API 寫入與讀取同步 (`routes/purchases.js`)**
 > * 更新 `POST /api/purchases` 與 `GET /api/purchases`，確保上述新增欄位能正確寫入資料庫與回傳至前端檢視 Modal 中。
+
+## 🚀 開發進度與架構更新 (2026-08-06)
+
+### ☕ 「進貨管理 (Purchase Management)」方案 A 多層卡片式改版完成
+
+成功實現 **「方案 A：多層卡片式排版 (Card-based Layout)」**，完成生豆履歷與風味描述欄位擴充，並修復物料類型切換與編輯儲存 Bug。
+
+---
+
+### 🗄️ 1. 資料庫 Schema 擴充與 API 同步
+* **PostgreSQL `purchase_items` 明細表擴充欄位**：
+  * `item_code`：商品編號 / 生豆編號（如 `BV-84N`、`K190`）
+  * `variety`：品種 / 豆種（如 `Red Catuai`、`阿拉比卡`）
+  * `altitude`：海拔（如 `1100m`、`1500m+`）
+  * `flavor_description`：風味描述（全寬文字，紀錄完整杯測風味）
+* **API 邏輯調整**：同步更新 `POST /api/purchases`、`GET /api/purchases` 與 `PUT /api/purchases/:id`，確保新欄位能完整寫入、讀取與更新。
+
+---
+
+### 🎨 2. UI 多層卡片式結構與動態收合
+* **三層式卡片排版**：
+  * **Row 1（交易資訊）**：物料類型選單、商品編號、品項名稱、數量、單位、單價、小計、$0 預設運算與刪除按鈕。
+  * **Row 2（生豆履歷 - 僅類型為生豆時顯示）**：批號/產季、產地、品種、海拔、處理法。
+  * **Row 3（風味描述 - 僅類型為生豆時顯示）**：風味描述全寬輸入框。
+* **動態切換機制**：
+  * 當切換為 **「包材 / 耗材 / 其他」** 時，自動隱藏 Row 2 與 Row 3，卡片縮回俐落單行，保持介面簡潔。
+  * 當切換為 **「生豆」** 時，自動展開 Row 2 與 Row 3 履歷與風味欄位，預設為可直接打字狀態。
+
+---
+
+### 🔧 3. 系統 Bug 修復
+* **修復 `PUT /api/purchases/:id` 編輯儲存 Bug**：解決先前編輯進貨單儲存時拋出 `Unexpected token '<', "<!DOCTYPE "... is not valid JSON` 的問題，編輯儲存與檢視功能恢復正常。
    

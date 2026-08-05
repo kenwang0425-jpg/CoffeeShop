@@ -343,10 +343,14 @@ async function initializeDB() {
         id SERIAL PRIMARY KEY,
         purchase_id VARCHAR(30) REFERENCES purchases(id) ON DELETE CASCADE,
         item_type VARCHAR(30) NOT NULL,
+        item_code VARCHAR(50) NULL,
         item_name VARCHAR(255) NOT NULL,
         batch_no VARCHAR(50) NULL,
         origin VARCHAR(100) NULL,
+        variety VARCHAR(100) NULL,
+        altitude VARCHAR(50) NULL,
         process_method VARCHAR(50) NULL,
+        flavor_description TEXT NULL,
         quantity NUMERIC(10,2) NOT NULL,
         remaining_quantity NUMERIC(10,2) NOT NULL,
         unit VARCHAR(20) NOT NULL,
@@ -364,6 +368,11 @@ async function initializeDB() {
       ALTER TABLE Products ADD COLUMN IF NOT EXISTS StockUnit_2 VARCHAR(20) NULL;
       ALTER TABLE Products ADD COLUMN IF NOT EXISTS Stock_3     INT         NULL;
       ALTER TABLE Products ADD COLUMN IF NOT EXISTS StockUnit_3 VARCHAR(20) NULL;
+
+      ALTER TABLE purchase_items ADD COLUMN IF NOT EXISTS item_code VARCHAR(50) NULL;
+      ALTER TABLE purchase_items ADD COLUMN IF NOT EXISTS variety VARCHAR(100) NULL;
+      ALTER TABLE purchase_items ADD COLUMN IF NOT EXISTS altitude VARCHAR(50) NULL;
+      ALTER TABLE purchase_items ADD COLUMN IF NOT EXISTS flavor_description TEXT NULL;
 
       -- 為舊有資料或預設商品的 NULL 庫存單位與數量進行回填
       UPDATE Products SET Stock_1 = COALESCE(Stock_1, 50), StockUnit_1 = '包' WHERE ProductID = 'CO135' AND StockUnit_1 IS NULL;
@@ -1524,12 +1533,12 @@ async function createPurchase(purchaseData) {
         for (const item of items) {
           await client.query(
             `INSERT INTO purchase_items 
-             (purchase_id, item_type, item_name, batch_no, origin, process_method, quantity, remaining_quantity, unit, unit_price, subtotal)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+             (purchase_id, item_type, item_name, item_code, batch_no, origin, variety, altitude, process_method, flavor_description, quantity, remaining_quantity, unit, unit_price, subtotal)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
             [
-              purchaseId, item.item_type, item.item_name, item.batch_no || null,
-              item.origin || null, item.process_method || null, 
-              item.quantity, item.quantity, item.unit, item.unit_price, item.subtotal
+              purchaseId, item.item_type, item.item_name, item.item_code || null, item.batch_no || null,
+              item.origin || null, item.variety || null, item.altitude || null, item.process_method || null, 
+              item.flavor_description || null, item.quantity, item.quantity, item.unit, item.unit_price, item.subtotal
             ]
           );
         }
@@ -1562,6 +1571,70 @@ async function createPurchase(purchaseData) {
   };
   mockPurchases.unshift(newPurchase);
   return purchaseId;
+}
+
+async function updatePurchase(id, purchaseData) {
+  const { supplier_id, supplier_name, purchase_date, total_amount, status, note, items } = purchaseData;
+  
+  if (pool) {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      
+      await client.query(
+        `UPDATE purchases SET 
+           supplier_id = $1, supplier_name = $2, purchase_date = $3, 
+           total_amount = $4, status = $5, note = $6, updated_at = CURRENT_TIMESTAMP
+         WHERE id = $7`,
+        [supplier_id || null, supplier_name, purchase_date, total_amount, status || 'completed', note, id]
+      );
+      
+      await client.query('DELETE FROM purchase_items WHERE purchase_id = $1', [id]);
+      
+      if (Array.isArray(items) && items.length > 0) {
+        for (const item of items) {
+          await client.query(
+            `INSERT INTO purchase_items 
+             (purchase_id, item_type, item_name, item_code, batch_no, origin, variety, altitude, process_method, flavor_description, quantity, remaining_quantity, unit, unit_price, subtotal)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
+            [
+              id, item.item_type, item.item_name, item.item_code || null, item.batch_no || null,
+              item.origin || null, item.variety || null, item.altitude || null, item.process_method || null, 
+              item.flavor_description || null, item.quantity, item.quantity, item.unit, item.unit_price, item.subtotal
+            ]
+          );
+        }
+      }
+      
+      await client.query('COMMIT');
+      return true;
+    } catch (err) {
+      await client.query('ROLLBACK');
+      console.error('PostgreSQL updatePurchase 交易失敗，已 ROLLBACK:', err.message);
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+  
+  const idx = mockPurchases.findIndex(p => p.id === id);
+  if (idx !== -1) {
+    const itemsWithRemaining = (items || []).map((item, index) => ({
+      id: Date.now() + index,
+      purchase_id: id,
+      ...item,
+      remaining_quantity: item.quantity
+    }));
+    
+    mockPurchases[idx] = {
+      ...mockPurchases[idx],
+      supplier_id, supplier_name, purchase_date, total_amount, status: status || 'completed', note,
+      updated_at: new Date(),
+      items: itemsWithRemaining
+    };
+    return true;
+  }
+  return false;
 }
 
 async function updatePurchaseStatus(id, status) {
@@ -1610,5 +1683,5 @@ module.exports = {
   getCustomerByPhone, getOrdersByPhone, createOrder,
   getAdminOrders, updateOrderStatus,
   getSuppliers, getSupplierByID, addSupplier, updateSupplier, deleteSupplier,
-  getPurchases, getPurchaseByID, createPurchase, updatePurchaseStatus, deletePurchase
+  getPurchases, getPurchaseByID, createPurchase, updatePurchase, updatePurchaseStatus, deletePurchase
 };

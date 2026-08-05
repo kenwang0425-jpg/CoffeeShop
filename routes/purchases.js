@@ -46,6 +46,30 @@ router.post('/', async (req, res) => {
   }
 });
 
+// PUT /api/purchases/:id
+router.put('/:id', async (req, res) => {
+  const { id } = req.params;
+  const { purchase_date, items } = req.body;
+  
+  if (!purchase_date) {
+    return res.status(400).json({ success: false, message: '進貨日期為必填' });
+  }
+  if (!Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ success: false, message: '必須包含至少一筆進貨明細' });
+  }
+  
+  try {
+    const success = await db.updatePurchase(id, req.body);
+    if (success) {
+      res.json({ success: true, message: '進貨單更新成功！' });
+    } else {
+      res.status(404).json({ success: false, message: '找不到指定的進貨單' });
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // PUT /api/purchases/:id/status
 router.put('/:id/status', async (req, res) => {
   const { id } = req.params;

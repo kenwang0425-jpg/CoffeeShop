@@ -159,8 +159,24 @@
       headers: { 'Content-Type': 'application/json', ...options.headers },
       ...options
     });
+    
+    if (!resp.ok) {
+      const text = await resp.text();
+      console.error(`[apiFetch Error] ${resp.status} ${resp.statusText} at ${url}:`, text);
+      let errMsg = `伺服器錯誤 (${resp.status})`;
+      try {
+        const json = JSON.parse(text);
+        if (json.message) errMsg = json.message;
+        else if (json.error) errMsg = json.error;
+      } catch (e) {
+        // Not JSON
+        errMsg += ' (非 JSON 回傳格式)';
+      }
+      throw new Error(errMsg);
+    }
+    
     const json = await resp.json();
-    if (!resp.ok || !json.success) throw new Error(json.message || '伺服器錯誤');
+    if (!json.success) throw new Error(json.message || json.error || '伺服器回傳失敗');
     return json;
   }
 
@@ -1702,6 +1718,7 @@
   //  ─── 進貨管理 ───
   // ════════════════════════════════════════════════════
   let allPurchases = [];
+  let currentPurchaseEditID = null;
   
   async function loadPurchases() {
     const loading = $('purchase-loading-spinner');
@@ -1767,8 +1784,8 @@
         <td class="align-middle text-warning fw-bold">$${totalAmount}</td>
         <td class="align-middle">${statusBadge}</td>
         <td class="align-middle text-center">
-          <button class="btn btn-sm btn-outline-primary me-1 btn-view-purchase" data-id="${p.id}" title="檢視明細">
-            <i class="bi bi-eye-fill"></i>
+          <button class="btn btn-sm btn-outline-primary me-1 btn-edit-purchase" data-id="${p.id}" title="編輯進貨單">
+            <i class="bi bi-pencil-fill"></i>
           </button>
           <button class="btn btn-sm btn-outline-info me-1 btn-toggle-purchase-status" data-id="${p.id}" data-status="${p.status}" title="切換狀態">
             <i class="bi bi-arrow-repeat"></i>
@@ -1781,10 +1798,10 @@
       tbody.appendChild(tr);
     });
 
-    document.querySelectorAll('.btn-view-purchase').forEach(btn => {
+    document.querySelectorAll('.btn-edit-purchase').forEach(btn => {
       btn.addEventListener('click', (e) => {
         const id = e.currentTarget.getAttribute('data-id');
-        openViewPurchaseModal(id);
+        openEditPurchaseModal(id);
       });
     });
 
@@ -1840,6 +1857,7 @@
   }
 
   function openPurchaseModal() {
+    currentPurchaseEditID = null;
     const form = $('purchase-form');
     if (!form || !purchaseModalBS) return;
 
@@ -1868,7 +1886,8 @@
     purchaseModalBS.show();
   }
 
-  async function openViewPurchaseModal(id) {
+  async function openEditPurchaseModal(id) {
+    currentPurchaseEditID = id;
     const form = $('purchase-form');
     if (!form || !purchaseModalBS) return;
 
@@ -1877,12 +1896,11 @@
     $('purchase-items-body').innerHTML = '';
     $('purchase-items-empty').classList.add('d-none');
     
-    // Hide save button and add item button for view mode
     const btnSave = $('btn-save-purchase');
     const btnAdd = $('btn-add-purchase-item');
-    if (btnSave) btnSave.classList.add('d-none');
-    if (btnAdd) btnAdd.classList.add('d-none');
-    $('purchase-modal-title').innerHTML = `<i class="bi bi-eye me-2"></i>檢視進貨單 - ${escHtml(id)}`;
+    if (btnSave) btnSave.classList.remove('d-none');
+    if (btnAdd) btnAdd.classList.remove('d-none');
+    $('purchase-modal-title').innerHTML = `<i class="bi bi-pencil-square me-2"></i>編輯進貨單 - ${escHtml(id)}`;
 
     await loadSupplierOptions();
     
@@ -1903,10 +1921,6 @@
         $('purchase-items-empty').classList.remove('d-none');
       }
       
-      // Make all inputs and remove buttons disabled for view mode
-      const inputs = form.querySelectorAll('input, select, button.btn-remove-item');
-      inputs.forEach(el => el.disabled = true);
-      
       purchaseModalBS.show();
     } catch(err) {
       showAlert('無法載入進貨單資料：' + err.message, 'danger');
@@ -1920,68 +1934,120 @@
     }
     
     $('purchase-items-empty').classList.add('d-none');
-    const tbody = $('purchase-items-body');
-    const tr = document.createElement('tr');
-    tr.className = 'purchase-item-row';
+    const container = $('purchase-items-body');
+    const card = document.createElement('div');
+    card.className = 'purchase-item-card card bg-dark border-secondary mb-2';
     
     const isBean = itemData ? (itemData.item_type === '生豆') : true;
     const itemType = itemData ? escHtml(itemData.item_type) : '生豆';
     
-    tr.innerHTML = `
-      <td>
-        <select class="form-select form-control-custom item-type" required>
-          <option value="生豆" ${itemType === '生豆' ? 'selected' : ''}>生豆</option>
-          <option value="包材" ${itemType === '包材' ? 'selected' : ''}>包材</option>
-          <option value="耗材" ${itemType === '耗材' ? 'selected' : ''}>耗材</option>
-          <option value="其他" ${itemType === '其他' ? 'selected' : ''}>其他</option>
-        </select>
-      </td>
-      <td><input type="text" class="form-control form-control-custom item-name" required placeholder="品項名稱" value="${itemData ? escHtml(itemData.item_name) : ''}"></td>
-      <td><input type="text" class="form-control form-control-custom item-batch bean-field" placeholder="批號" value="${itemData && itemData.batch_no ? escHtml(itemData.batch_no) : ''}" ${!isBean ? 'disabled' : ''}></td>
-      <td><input type="text" class="form-control form-control-custom item-origin bean-field" placeholder="產地" value="${itemData && itemData.origin ? escHtml(itemData.origin) : ''}" ${!isBean ? 'disabled' : ''}></td>
-      <td><input type="text" class="form-control form-control-custom item-process bean-field" placeholder="處理法" value="${itemData && itemData.process_method ? escHtml(itemData.process_method) : ''}" ${!isBean ? 'disabled' : ''}></td>
-      <td><input type="number" class="form-control form-control-custom item-quantity" step="0.01" min="0" required value="${itemData ? itemData.quantity : 0}"></td>
-      <td><input type="text" class="form-control form-control-custom item-unit" required value="${itemData ? escHtml(itemData.unit) : 'kg'}"></td>
-      <td><input type="number" class="form-control form-control-custom item-price" step="0.01" min="0" required value="${itemData ? itemData.unit_price : 0}"></td>
-      <td class="text-warning fw-bold item-subtotal">${itemData ? '$' + itemData.subtotal : '$0'}</td>
-      <td><button type="button" class="btn btn-sm btn-outline-danger btn-remove-item"><i class="bi bi-trash"></i></button></td>
+    card.innerHTML = `
+      <div class="card-body p-3">
+        <!-- Row 1: 交易資訊 -->
+        <div class="row g-2 align-items-center mb-2">
+          <div class="col-12 col-md-2">
+            <select class="form-select form-control-custom item-type form-select-sm" required>
+              <option value="生豆" ${itemType === '生豆' ? 'selected' : ''}>生豆</option>
+              <option value="包材" ${itemType === '包材' ? 'selected' : ''}>包材</option>
+              <option value="耗材" ${itemType === '耗材' ? 'selected' : ''}>耗材</option>
+              <option value="其他" ${itemType === '其他' ? 'selected' : ''}>其他</option>
+            </select>
+          </div>
+          <div class="col-6 col-md-2">
+            <input type="text" class="form-control form-control-custom item-code form-control-sm" placeholder="商品編號" value="${itemData && itemData.item_code ? escHtml(itemData.item_code) : ''}">
+          </div>
+          <div class="col-6 col-md-2">
+            <input type="text" class="form-control form-control-custom item-name form-control-sm" required placeholder="品項名稱" value="${itemData ? escHtml(itemData.item_name) : ''}">
+          </div>
+          <div class="col-4 col-md-1">
+            <input type="number" class="form-control form-control-custom item-quantity form-control-sm" step="0.01" min="0" required placeholder="數量" value="${itemData ? itemData.quantity : ''}">
+          </div>
+          <div class="col-4 col-md-1">
+            <input type="text" class="form-control form-control-custom item-unit form-control-sm" required placeholder="單位" value="${itemData ? escHtml(itemData.unit) : 'kg'}">
+          </div>
+          <div class="col-4 col-md-1">
+            <input type="number" class="form-control form-control-custom item-price form-control-sm" step="0.01" min="0" required placeholder="單價" value="${itemData ? itemData.unit_price : ''}">
+          </div>
+          <div class="col-8 col-md-2 text-end">
+            <span class="text-warning fw-bold item-subtotal d-inline-block mt-1">${itemData ? '$' + itemData.subtotal : '$0'}</span>
+          </div>
+          <div class="col-4 col-md-1 text-end">
+            <button type="button" class="btn btn-sm btn-outline-danger btn-remove-item"><i class="bi bi-trash"></i></button>
+          </div>
+        </div>
+        
+        <!-- Row 2: 生豆履歷 -->
+        <div class="row g-2 align-items-center mb-2 bean-row">
+          <div class="col-12 col-md-2">
+            <input type="text" class="form-control form-control-custom item-batch form-control-sm bean-field" placeholder="批號/產季" value="${itemData && itemData.batch_no ? escHtml(itemData.batch_no) : ''}">
+          </div>
+          <div class="col-6 col-md-2">
+            <input type="text" class="form-control form-control-custom item-origin form-control-sm bean-field" placeholder="產地" value="${itemData && itemData.origin ? escHtml(itemData.origin) : ''}">
+          </div>
+          <div class="col-6 col-md-3">
+            <input type="text" class="form-control form-control-custom item-variety form-control-sm bean-field" placeholder="品種" value="${itemData && itemData.variety ? escHtml(itemData.variety) : ''}">
+          </div>
+          <div class="col-6 col-md-2">
+            <input type="text" class="form-control form-control-custom item-altitude form-control-sm bean-field" placeholder="海拔" value="${itemData && itemData.altitude ? escHtml(itemData.altitude) : ''}">
+          </div>
+          <div class="col-6 col-md-3">
+            <input type="text" class="form-control form-control-custom item-process form-control-sm bean-field" placeholder="處理法" value="${itemData && itemData.process_method ? escHtml(itemData.process_method) : ''}">
+          </div>
+        </div>
+        
+        <!-- Row 3: 風味描述 -->
+        <div class="row g-2 bean-row">
+          <div class="col-12">
+            <input type="text" class="form-control form-control-custom item-flavor form-control-sm bean-field" placeholder="風味描述" value="${itemData && itemData.flavor_description ? escHtml(itemData.flavor_description) : ''}">
+          </div>
+        </div>
+      </div>
     `;
     
-    tbody.appendChild(tr);
+    container.appendChild(card);
     
-    tr.querySelector('.item-type').addEventListener('change', (e) => {
+    card.querySelector('.item-type').addEventListener('change', (e) => {
       const isBean = e.target.value === '生豆';
-      tr.querySelectorAll('.bean-field').forEach(el => {
-        el.disabled = !isBean;
-        if (!isBean) el.value = '';
+      card.querySelectorAll('.bean-row').forEach(row => {
+        if (isBean) {
+          row.classList.remove('d-none');
+        } else {
+          row.classList.add('d-none');
+        }
       });
+      // Optionally clear values if not bean
+      if (!isBean) {
+        card.querySelectorAll('.bean-field').forEach(el => {
+          el.value = '';
+        });
+      }
     });
     
     // 初始化時手動觸發一次，確保欄位鎖定狀態與選單預設值完全同步
-    tr.querySelector('.item-type').dispatchEvent(new Event('change'));
+    card.querySelector('.item-type').dispatchEvent(new Event('change'));
     
     const calc = () => {
-      const q = parseFloat(tr.querySelector('.item-quantity').value) || 0;
-      const p = parseFloat(tr.querySelector('.item-price').value) || 0;
+      const q = parseFloat(card.querySelector('.item-quantity').value) || 0;
+      const p = parseFloat(card.querySelector('.item-price').value) || 0;
       const sub = Math.round(q * p);
-      tr.querySelector('.item-subtotal').textContent = '$' + sub;
+      card.querySelector('.item-subtotal').textContent = '$' + sub;
       calcPurchaseTotal();
     };
-    tr.querySelector('.item-quantity').addEventListener('input', calc);
-    tr.querySelector('.item-price').addEventListener('input', calc);
+    card.querySelector('.item-quantity').addEventListener('input', calc);
+    card.querySelector('.item-price').addEventListener('input', calc);
     
     if (itemData) calcPurchaseTotal();
     
-    tr.querySelector('.btn-remove-item').addEventListener('click', () => {
-      tr.remove();
+    card.querySelector('.btn-remove-item').addEventListener('click', () => {
+      card.remove();
       calcPurchaseTotal();
-      if (tbody.children.length === 0) $('purchase-items-empty').classList.remove('d-none');
+      if (container.children.length === 0) $('purchase-items-empty').classList.remove('d-none');
     });
   }
 
   function calcPurchaseTotal() {
     let total = 0;
-    document.querySelectorAll('.purchase-item-row').forEach(tr => {
+    document.querySelectorAll('.purchase-item-card').forEach(tr => {
       const text = tr.querySelector('.item-subtotal').textContent.replace('$', '');
       total += parseInt(text, 10) || 0;
     });
@@ -1998,24 +2064,28 @@
       return;
     }
     
-    const itemRows = document.querySelectorAll('.purchase-item-row');
+    const itemRows = document.querySelectorAll('.purchase-item-card');
     if (itemRows.length === 0) {
       showAlert('請至少新增一個進貨品項', 'warning');
       return;
     }
 
     const items = [];
-    itemRows.forEach(tr => {
+    itemRows.forEach(card => {
       items.push({
-        item_type: tr.querySelector('.item-type').value,
-        item_name: tr.querySelector('.item-name').value.trim(),
-        batch_no: tr.querySelector('.item-batch').value.trim(),
-        origin: tr.querySelector('.item-origin').value.trim(),
-        process_method: tr.querySelector('.item-process').value.trim(),
-        quantity: parseFloat(tr.querySelector('.item-quantity').value) || 0,
-        unit: tr.querySelector('.item-unit').value.trim(),
-        unit_price: parseFloat(tr.querySelector('.item-price').value) || 0,
-        subtotal: parseFloat(tr.querySelector('.item-subtotal').textContent.replace('$', '')) || 0
+        item_type: card.querySelector('.item-type').value,
+        item_code: card.querySelector('.item-code').value.trim(),
+        item_name: card.querySelector('.item-name').value.trim(),
+        batch_no: card.querySelector('.item-batch').value.trim(),
+        origin: card.querySelector('.item-origin').value.trim(),
+        variety: card.querySelector('.item-variety').value.trim(),
+        altitude: card.querySelector('.item-altitude').value.trim(),
+        process_method: card.querySelector('.item-process').value.trim(),
+        flavor_description: card.querySelector('.item-flavor').value.trim(),
+        quantity: parseFloat(card.querySelector('.item-quantity').value) || 0,
+        unit: card.querySelector('.item-unit').value.trim(),
+        unit_price: parseFloat(card.querySelector('.item-price').value) || 0,
+        subtotal: parseFloat(card.querySelector('.item-subtotal').textContent.replace('$', '')) || 0
       });
     });
     
@@ -2038,11 +2108,19 @@
     if (spinner) spinner.classList.remove('d-none');
 
     try {
-      await apiFetch('/api/purchases', {
-        method: 'POST',
-        body: JSON.stringify(payload)
-      });
-      showAlert('進貨單建立成功！', 'success');
+      if (currentPurchaseEditID) {
+        await apiFetch(`/api/purchases/${currentPurchaseEditID}`, {
+          method: 'PUT',
+          body: JSON.stringify(payload)
+        });
+        showAlert('進貨單更新成功！', 'success');
+      } else {
+        await apiFetch('/api/purchases', {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        });
+        showAlert('進貨單建立成功！', 'success');
+      }
       purchaseModalBS.hide();
       loadPurchases();
     } catch (err) {

@@ -810,26 +810,10 @@
               </button>
             </div>
             
-            <div class="table-responsive mb-3" style="min-height: 200px;">
-              <table class="table custom-table table-sm align-middle" id="purchase-items-table">
-                <thead>
-                  <tr>
-                    <th style="min-width: 90px">類型</th>
-                    <th style="min-width: 160px">品項名稱</th>
-                    <th style="min-width: 130px" class="bean-only-header">批號/產季</th>
-                    <th style="min-width: 130px" class="bean-only-header">產地</th>
-                    <th style="min-width: 130px" class="bean-only-header">處理法</th>
-                    <th style="min-width: 80px">數量</th>
-                    <th style="min-width: 60px">單位</th>
-                    <th style="min-width: 90px">單價</th>
-                    <th style="min-width: 100px">小計</th>
-                    <th style="min-width: 50px">操作</th>
-                  </tr>
-                </thead>
-                <tbody id="purchase-items-body">
-                  <!-- JS dynamically fills this -->
-                </tbody>
-              </table>
+            <div class="mb-3" style="min-height: 200px;">
+              <div id="purchase-items-body" class="d-flex flex-column gap-3">
+                <!-- JS dynamically fills this with cards -->
+              </div>
               <div class="text-center p-3 text-muted d-none" id="purchase-items-empty">
                 請點擊右上角「新增品項」以添加進貨明細
               </div>
