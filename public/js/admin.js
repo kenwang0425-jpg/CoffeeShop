@@ -255,6 +255,7 @@
       }
       if (supInput) supInput.value = '';
       
+      loadSupplierOptions();
       loadPurchases();
     }
   }
@@ -1843,14 +1844,17 @@
       const json = await apiFetch('/api/suppliers');
       const suppliers = json.data || [];
       
-      if (sel1) {
-        sel1.innerHTML = '<option value="">全部進貨商</option>';
-        suppliers.forEach(s => sel1.innerHTML += `<option value="${s.id}">${escHtml(s.name)}</option>`);
-      }
-      if (sel2) {
-        sel2.innerHTML = '<option value="">── 請選擇進貨商 ──</option>';
-        suppliers.forEach(s => sel2.innerHTML += `<option value="${s.id}">${escHtml(s.name)}</option>`);
-      }
+      let optionsHtml1 = '<option value="">全部進貨商</option>';
+      let optionsHtml2 = '<option value="">── 請選擇進貨商 ──</option>';
+      
+      suppliers.forEach(s => {
+        const opt = `<option value="${s.id}">${escHtml(s.name)}</option>`;
+        optionsHtml1 += opt;
+        optionsHtml2 += opt;
+      });
+      
+      if (sel1) sel1.innerHTML = optionsHtml1;
+      if (sel2) sel2.innerHTML = optionsHtml2;
     } catch(err) {
       console.error('載入進貨商選項失敗:', err);
     }

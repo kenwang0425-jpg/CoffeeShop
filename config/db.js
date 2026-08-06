@@ -1441,7 +1441,7 @@ async function deleteSupplier(id) {
 // 進貨管理 Purchase 相關操作
 // ============================================================
 
-async function getPurchases(startDate, endDate, supplierId) {
+async function getPurchases(startDate, endDate, supplierId, supplierName) {
   if (pool) {
     try {
       let query = "SELECT *, to_char(purchase_date, 'YYYY-MM-DD') AS purchase_date FROM purchases WHERE 1=1";
@@ -1457,8 +1457,28 @@ async function getPurchases(startDate, endDate, supplierId) {
         params.push(endDate);
       }
       if (supplierId) {
-        query += ` AND supplier_id = $${paramIndex++}`;
-        params.push(supplierId);
+        if (!isNaN(supplierId) && !isNaN(parseFloat(supplierId))) {
+          const supRes = await pool.query('SELECT name FROM suppliers WHERE id = $1', [supplierId]);
+          let supName = '';
+          if (supRes.rows.length > 0) {
+            supName = supRes.rows[0].name.trim();
+          }
+          if (supName) {
+            query += ` AND (supplier_id = $${paramIndex} OR TRIM(supplier_name) ILIKE $${paramIndex+1})`;
+            params.push(supplierId, `%${supName}%`);
+            paramIndex += 2;
+          } else {
+            query += ` AND supplier_id = $${paramIndex++}`;
+            params.push(supplierId);
+          }
+        } else {
+          query += ` AND TRIM(supplier_name) ILIKE $${paramIndex++}`;
+          params.push(`%${String(supplierId).trim()}%`);
+        }
+      }
+      if (supplierName) {
+        query += ` AND TRIM(supplier_name) ILIKE $${paramIndex++}`;
+        params.push(`%${String(supplierName).trim()}%`);
       }
       
       query += ' ORDER BY created_at DESC';
@@ -1493,7 +1513,23 @@ async function getPurchases(startDate, endDate, supplierId) {
   let result = [...mockPurchases];
   if (startDate) result = result.filter(p => p.purchase_date >= startDate);
   if (endDate) result = result.filter(p => p.purchase_date <= endDate + ' 23:59:59');
-  if (supplierId) result = result.filter(p => String(p.supplier_id) === String(supplierId));
+  if (supplierId) {
+    if (!isNaN(supplierId) && !isNaN(parseFloat(supplierId))) {
+      const mockSup = mockSuppliers.find(s => String(s.id) === String(supplierId));
+      const supName = mockSup ? mockSup.name.trim().toLowerCase() : '';
+      result = result.filter(p => 
+        String(p.supplier_id) === String(supplierId) || 
+        (supName && p.supplier_name && p.supplier_name.trim().toLowerCase().includes(supName))
+      );
+    } else {
+      const qName = String(supplierId).trim().toLowerCase();
+      result = result.filter(p => p.supplier_name && p.supplier_name.trim().toLowerCase().includes(qName));
+    }
+  }
+  if (supplierName) {
+    const qName = String(supplierName).trim().toLowerCase();
+    result = result.filter(p => p.supplier_name && p.supplier_name.trim().toLowerCase().includes(qName));
+  }
   return result;
 }
 
@@ -1523,10 +1559,18 @@ async function createPurchase(purchaseData) {
     try {
       await client.query('BEGIN');
       
+      let final_supplier_name = supplier_name ? supplier_name.trim() : null;
+      if (supplier_id) {
+        const supRes = await client.query('SELECT name FROM suppliers WHERE id = $1', [supplier_id]);
+        if (supRes.rows.length > 0) {
+          final_supplier_name = supRes.rows[0].name.trim();
+        }
+      }
+      
       await client.query(
         `INSERT INTO purchases (id, supplier_id, supplier_name, purchase_date, total_amount, status, note)
          VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [purchaseId, supplier_id || null, supplier_name, purchase_date, total_amount, status || 'completed', note]
+        [purchaseId, supplier_id || null, final_supplier_name, purchase_date, total_amount, status || 'completed', note]
       );
       
       if (Array.isArray(items) && items.length > 0) {
@@ -1563,9 +1607,15 @@ async function createPurchase(purchaseData) {
     remaining_quantity: item.quantity
   }));
   
+  let final_mock_supplier_name = supplier_name ? supplier_name.trim() : null;
+  if (supplier_id) {
+    const mockSup = mockSuppliers.find(s => String(s.id) === String(supplier_id));
+    if (mockSup) final_mock_supplier_name = mockSup.name.trim();
+  }
+
   const newPurchase = {
     id: purchaseId,
-    supplier_id, supplier_name, purchase_date, total_amount, status: status || 'completed', note,
+    supplier_id, supplier_name: final_mock_supplier_name, purchase_date, total_amount, status: status || 'completed', note,
     created_at: new Date(), updated_at: new Date(),
     items: itemsWithRemaining
   };
@@ -1581,12 +1631,20 @@ async function updatePurchase(id, purchaseData) {
     try {
       await client.query('BEGIN');
       
+      let final_supplier_name = supplier_name ? supplier_name.trim() : null;
+      if (supplier_id) {
+        const supRes = await client.query('SELECT name FROM suppliers WHERE id = $1', [supplier_id]);
+        if (supRes.rows.length > 0) {
+          final_supplier_name = supRes.rows[0].name.trim();
+        }
+      }
+      
       await client.query(
         `UPDATE purchases SET 
            supplier_id = $1, supplier_name = $2, purchase_date = $3, 
            total_amount = $4, status = $5, note = $6, updated_at = CURRENT_TIMESTAMP
          WHERE id = $7`,
-        [supplier_id || null, supplier_name, purchase_date, total_amount, status || 'completed', note, id]
+        [supplier_id || null, final_supplier_name, purchase_date, total_amount, status || 'completed', note, id]
       );
       
       await client.query('DELETE FROM purchase_items WHERE purchase_id = $1', [id]);
@@ -1626,9 +1684,15 @@ async function updatePurchase(id, purchaseData) {
       remaining_quantity: item.quantity
     }));
     
+    let final_mock_supplier_name = supplier_name ? supplier_name.trim() : null;
+    if (supplier_id) {
+      const mockSup = mockSuppliers.find(s => String(s.id) === String(supplier_id));
+      if (mockSup) final_mock_supplier_name = mockSup.name.trim();
+    }
+    
     mockPurchases[idx] = {
       ...mockPurchases[idx],
-      supplier_id, supplier_name, purchase_date, total_amount, status: status || 'completed', note,
+      supplier_id, supplier_name: final_mock_supplier_name, purchase_date, total_amount, status: status || 'completed', note,
       updated_at: new Date(),
       items: itemsWithRemaining
     };

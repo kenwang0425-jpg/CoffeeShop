@@ -4,9 +4,9 @@ const db = require('../config/db');
 
 // GET /api/purchases
 router.get('/', async (req, res) => {
-  const { startDate, endDate, supplierId } = req.query;
+  const { startDate, endDate, supplierId, supplier } = req.query;
   try {
-    const purchases = await db.getPurchases(startDate, endDate, supplierId);
+    const purchases = await db.getPurchases(startDate, endDate, supplierId, supplier);
     res.json({ success: true, data: purchases });
   } catch (err) {
     res.status(500).json({ success: false, message: '取得進貨單列表失敗：' + err.message });
