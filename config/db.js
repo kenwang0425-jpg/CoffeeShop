@@ -357,6 +357,51 @@ async function initializeDB() {
         unit_price NUMERIC(10,2) NOT NULL,
         subtotal NUMERIC(12,2) NOT NULL
       );
+
+      -- 1. 烘豆紀錄主表 (Roast Records)
+      CREATE TABLE IF NOT EXISTS roast_records (
+        id SERIAL PRIMARY KEY,
+        roast_batch_no VARCHAR(50) NOT NULL UNIQUE,
+        roast_date DATE NOT NULL DEFAULT CURRENT_DATE,
+        total_green_weight NUMERIC(10,2) NOT NULL,
+        roasted_weight NUMERIC(10,2) NOT NULL,
+        weight_loss_rate NUMERIC(5,2) NOT NULL,
+        note TEXT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      -- 2. 烘豆生豆扣減明細表 (Roast Item Sources)
+      CREATE TABLE IF NOT EXISTS roast_item_sources (
+        id SERIAL PRIMARY KEY,
+        roast_id INT REFERENCES roast_records(id) ON DELETE CASCADE,
+        purchase_item_id INT REFERENCES purchase_items(id) ON DELETE RESTRICT,
+        used_weight NUMERIC(10,2) NOT NULL
+      );
+
+      -- 3. 包材與耗材領用紀錄表 (Material Usages)
+      CREATE TABLE IF NOT EXISTS material_usages (
+        id SERIAL PRIMARY KEY,
+        purchase_item_id INT REFERENCES purchase_items(id) ON DELETE RESTRICT,
+        usage_type VARCHAR(30) NOT NULL DEFAULT 'usage',
+        quantity NUMERIC(10,2) NOT NULL,
+        usage_date DATE NOT NULL DEFAULT CURRENT_DATE,
+        note TEXT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      -- 4. 全物料庫存異動歷程流水帳 (Stock Logs)
+      CREATE TABLE IF NOT EXISTS stock_logs (
+        id SERIAL PRIMARY KEY,
+        item_type VARCHAR(30) NOT NULL,
+        purchase_item_id INT NULL REFERENCES purchase_items(id) ON DELETE SET NULL,
+        item_name VARCHAR(255) NOT NULL,
+        batch_no VARCHAR(50) NULL,
+        change_type VARCHAR(30) NOT NULL,
+        change_amount NUMERIC(10,2) NOT NULL,
+        unit VARCHAR(20) NOT NULL,
+        note TEXT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
     `;
     await pool.query(createTableQuery);
 
@@ -1738,6 +1783,287 @@ async function deletePurchase(id) {
   return mockPurchases.length < initialLength;
 }
 
+// ============================================================
+// Roast Records (烘豆紀錄)
+// ============================================================
+async function getRoastRecords() {
+  if (pool) {
+    try {
+      const query = `
+        SELECT r.*,
+               json_agg(json_build_object(
+                 'purchase_item_id', s.purchase_item_id,
+                 'used_weight', s.used_weight
+               )) AS sources
+        FROM roast_records r
+        LEFT JOIN roast_item_sources s ON r.id = s.roast_id
+        GROUP BY r.id
+        ORDER BY r.created_at DESC
+      `;
+      const result = await pool.query(query);
+      return result.rows;
+    } catch (err) {
+      console.error('PostgreSQL getRoastRecords 錯誤:', err.message);
+    }
+  }
+  return [];
+}
+
+async function addRoastRecord(data) {
+  const { roast_batch_no, roast_date, total_green_weight, roasted_weight, weight_loss_rate, note, sources } = data;
+  if (pool) {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const insertRecordQuery = `
+        INSERT INTO roast_records (roast_batch_no, roast_date, total_green_weight, roasted_weight, weight_loss_rate, note)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING id
+      `;
+      const recordResult = await client.query(insertRecordQuery, [roast_batch_no, roast_date, total_green_weight, roasted_weight, weight_loss_rate, note]);
+      const roastId = recordResult.rows[0].id;
+
+      if (Array.isArray(sources) && sources.length > 0) {
+        for (const src of sources) {
+          // 1. 查詢生豆庫存
+          const itemRes = await client.query(
+            'SELECT item_name, batch_no, unit, remaining_quantity FROM purchase_items WHERE id = $1',
+            [src.purchase_item_id]
+          );
+          
+          if (itemRes.rows.length === 0) {
+            throw new Error(`找不到生豆項目 ID: ${src.purchase_item_id}`);
+          }
+          
+          const { item_name, batch_no, unit, remaining_quantity } = itemRes.rows[0];
+          const used_weight = Number(src.used_weight);
+          const remaining = Number(remaining_quantity);
+
+          // 2. 防呆檢查
+          if (remaining < used_weight) {
+            throw new Error(`生豆「${item_name}」庫存不足 (剩餘 ${remaining})，無法扣減！`);
+          }
+
+          // 3. 扣減剩餘量
+          await client.query(
+            'UPDATE purchase_items SET remaining_quantity = remaining_quantity - $1 WHERE id = $2',
+            [used_weight, src.purchase_item_id]
+          );
+
+          // 4. 寫入明細
+          await client.query(
+            `INSERT INTO roast_item_sources (roast_id, purchase_item_id, used_weight) VALUES ($1, $2, $3)`,
+            [roastId, src.purchase_item_id, used_weight]
+          );
+
+          // 5. 寫入流水帳 (生豆扣減)
+          await client.query(
+            `INSERT INTO stock_logs (item_type, purchase_item_id, item_name, batch_no, change_type, change_amount, unit, note)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+            ['生豆', src.purchase_item_id, item_name, batch_no, 'roast_out', -used_weight, unit, `烘豆扣減 (批號: ${roast_batch_no})`]
+          );
+        }
+      }
+      
+      // 6. 寫入熟豆產出流水帳
+      await client.query(
+        `INSERT INTO stock_logs (item_type, purchase_item_id, item_name, batch_no, change_type, change_amount, unit, note)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        ['熟豆', null, `烘焙熟豆批次`, roast_batch_no, 'roast_in', Number(roasted_weight), 'g', `烘豆產出熟豆 (批號: ${roast_batch_no})`]
+      );
+
+      await client.query('COMMIT');
+      return roastId;
+    } catch (err) {
+      await client.query('ROLLBACK');
+      console.error('PostgreSQL addRoastRecord 交易失敗，已 ROLLBACK:', err.message);
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+  return null;
+}
+
+// ============================================================
+// Material Usages (包材/耗材領用紀錄)
+// ============================================================
+async function getMaterialUsages() {
+  if (pool) {
+    try {
+      const result = await pool.query(`
+        SELECT m.*, p.item_name, p.unit
+        FROM material_usages m
+        LEFT JOIN purchase_items p ON m.purchase_item_id = p.id
+        ORDER BY m.created_at DESC
+      `);
+      return result.rows;
+    } catch (err) {
+      console.error('PostgreSQL getMaterialUsages 錯誤:', err.message);
+    }
+  }
+  return [];
+}
+
+async function addMaterialUsage(data) {
+  const { purchase_item_id, usage_type, quantity, usage_date, note } = data;
+  if (pool) {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      // 1. 查詢庫存
+      const itemRes = await client.query(
+        'SELECT item_type, item_name, batch_no, unit, remaining_quantity FROM purchase_items WHERE id = $1',
+        [purchase_item_id]
+      );
+      
+      if (itemRes.rows.length === 0) {
+        throw new Error(`找不到物料項目 ID: ${purchase_item_id}`);
+      }
+
+      const { item_type, item_name, batch_no, unit, remaining_quantity } = itemRes.rows[0];
+      const used_qty = Number(quantity);
+      const remaining = Number(remaining_quantity);
+
+      // 2. 防呆檢查
+      if (remaining < used_qty) {
+        throw new Error(`物料「${item_name}」庫存不足，無法領用！`);
+      }
+
+      // 3. 扣減剩餘量
+      await client.query(
+        'UPDATE purchase_items SET remaining_quantity = remaining_quantity - $1 WHERE id = $2',
+        [used_qty, purchase_item_id]
+      );
+
+      // 4. 寫入 material_usages 表
+      const insertRecordQuery = `
+        INSERT INTO material_usages (purchase_item_id, usage_type, quantity, usage_date, note)
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING id
+      `;
+      const recordResult = await client.query(insertRecordQuery, [purchase_item_id, usage_type, used_qty, usage_date, note]);
+      const usageId = recordResult.rows[0].id;
+
+      // 5. 寫入流水帳
+      let noteStr = `包材/耗材領用 (${usage_type})`;
+      
+      await client.query(
+        `INSERT INTO stock_logs (item_type, purchase_item_id, item_name, batch_no, change_type, change_amount, unit, note)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [item_type, purchase_item_id, item_name, batch_no, 'material_out', -used_qty, unit, noteStr]
+      );
+
+      await client.query('COMMIT');
+      return usageId;
+    } catch (err) {
+      await client.query('ROLLBACK');
+      console.error('PostgreSQL addMaterialUsage 交易失敗，已 ROLLBACK:', err.message);
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+  return null;
+}
+
+// ============================================================
+// Stock Logs (全物料庫存異動歷程)
+// ============================================================
+async function getStockLogs() {
+  if (pool) {
+    try {
+      const result = await pool.query('SELECT * FROM stock_logs ORDER BY created_at DESC');
+      return result.rows;
+    } catch (err) {
+      console.error('PostgreSQL getStockLogs 錯誤:', err.message);
+    }
+  }
+  return [];
+}
+
+async function addStockLog(data) {
+  const { item_type, purchase_item_id, item_name, batch_no, change_type, change_amount, unit, note } = data;
+  if (pool) {
+    try {
+      const query = `
+        INSERT INTO stock_logs (item_type, purchase_item_id, item_name, batch_no, change_type, change_amount, unit, note)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        RETURNING id
+      `;
+      const result = await pool.query(query, [item_type, purchase_item_id, item_name, batch_no, change_type, change_amount, unit, note]);
+      return result.rows[0].id;
+    } catch (err) {
+      console.error('PostgreSQL addStockLog 錯誤:', err.message);
+      throw err;
+    }
+  }
+  return null;
+}
+
+// ============================================================
+// 可用物料查詢 (Dropdowns)
+// ============================================================
+async function getAvailableGreenBeans() {
+  if (pool) {
+    try {
+      const query = `
+        SELECT pi.*, p.purchase_date, p.supplier_name
+        FROM purchase_items pi
+        LEFT JOIN purchases p ON pi.purchase_id = p.id
+        WHERE pi.item_type = '生豆' AND pi.remaining_quantity > 0
+        ORDER BY p.purchase_date DESC, pi.id DESC
+      `;
+      const result = await pool.query(query);
+      return result.rows;
+    } catch (err) {
+      console.error('PostgreSQL getAvailableGreenBeans 錯誤:', err.message);
+    }
+  }
+  return [];
+}
+
+async function getAvailableMaterials() {
+  if (pool) {
+    try {
+      const query = `
+        SELECT pi.*, p.purchase_date, p.supplier_name
+        FROM purchase_items pi
+        LEFT JOIN purchases p ON pi.purchase_id = p.id
+        WHERE pi.item_type IN ('包材', '耗材') AND pi.remaining_quantity > 0
+        ORDER BY p.purchase_date DESC, pi.id DESC
+      `;
+      const result = await pool.query(query);
+      return result.rows;
+    } catch (err) {
+      console.error('PostgreSQL getAvailableMaterials 錯誤:', err.message);
+    }
+  }
+  return [];
+}
+
+async function getInventoryOverview() {
+  if (pool) {
+    try {
+      const query = `
+        SELECT item_type, item_name, unit, SUM(remaining_quantity) as total_remaining
+        FROM purchase_items
+        WHERE remaining_quantity > 0
+        GROUP BY item_type, item_name, unit
+        ORDER BY 
+          CASE item_type WHEN '生豆' THEN 1 WHEN '包材' THEN 2 WHEN '耗材' THEN 3 ELSE 4 END,
+          item_name
+      `;
+      const result = await pool.query(query);
+      return result.rows;
+    } catch (err) {
+      console.error('PostgreSQL getInventoryOverview 錯誤:', err.message);
+    }
+  }
+  return [];
+}
+
 module.exports = {
   initializeDB,
   getProducts, getProductByID, isProductIDExists, addProduct, updateProduct, deleteProduct,
@@ -1747,5 +2073,10 @@ module.exports = {
   getCustomerByPhone, getOrdersByPhone, createOrder,
   getAdminOrders, updateOrderStatus,
   getSuppliers, getSupplierByID, addSupplier, updateSupplier, deleteSupplier,
-  getPurchases, getPurchaseByID, createPurchase, updatePurchase, updatePurchaseStatus, deletePurchase
+  getPurchases, getPurchaseByID, createPurchase, updatePurchase, updatePurchaseStatus, deletePurchase,
+  getRoastRecords, addRoastRecord,
+  getMaterialUsages, addMaterialUsage,
+  getStockLogs, addStockLog,
+  getAvailableGreenBeans, getAvailableMaterials,
+  getInventoryOverview
 };

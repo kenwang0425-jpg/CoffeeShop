@@ -55,6 +55,12 @@
             <span>進貨管理</span>
           </a>
         </li>
+        <li class="menu-item" id="menu-inventory">
+          <a href="#">
+            <i class="bi bi-box-seam"></i>
+            <span>庫存與烘豆</span>
+          </a>
+        </li>
         <li class="menu-item" id="menu-business-hours">
           <a href="#">
             <i class="bi bi-clock-fill"></i>
@@ -277,6 +283,114 @@
             </div>
           </div>
         </div> <!-- Closed section-purchases -->
+
+        <!-- ── 庫存與烘豆管理區塊 ── -->
+        <div id="section-inventory" class="d-none">
+          <div class="glass-card">
+            <!-- 頁籤 (Tabs) -->
+            <ul class="nav nav-tabs custom-tabs mb-4" id="inventoryTabs" role="tablist">
+              <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="tab-inventory-overview" data-bs-toggle="tab" data-bs-target="#pane-inventory-overview" type="button" role="tab">📦 庫存總覽</button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button class="nav-link" id="tab-roast-records" data-bs-toggle="tab" data-bs-target="#pane-roast-records" type="button" role="tab">🔥 烘豆出庫紀錄</button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button class="nav-link" id="tab-material-usages" data-bs-toggle="tab" data-bs-target="#pane-material-usages" type="button" role="tab">📦 包耗材領用</button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button class="nav-link" id="tab-stock-logs" data-bs-toggle="tab" data-bs-target="#pane-stock-logs" type="button" role="tab">📊 庫存異動歷程</button>
+              </li>
+            </ul>
+
+            <!-- Tab Contents -->
+            <div class="tab-content" id="inventoryTabsContent">
+              
+              <!-- Tab 0: 庫存總覽 -->
+              <div class="tab-pane fade show active" id="pane-inventory-overview" role="tabpanel">
+                <div class="table-responsive">
+                  <table class="table custom-table">
+                    <thead>
+                      <tr>
+                        <th>物料類型</th>
+                        <th>品項名稱</th>
+                        <th>剩餘總庫存</th>
+                        <th>單位</th>
+                      </tr>
+                    </thead>
+                    <tbody id="inventory-overview-body"></tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- Tab 1: 烘豆紀錄 -->
+              <div class="tab-pane fade" id="pane-roast-records" role="tabpanel">
+                <div class="d-flex justify-content-end mb-3">
+                  <button class="btn btn-custom-primary" id="btn-add-roast-record">
+                    <i class="bi bi-plus-circle-fill"></i> 新增烘豆紀錄
+                  </button>
+                </div>
+                <div class="table-responsive">
+                  <table class="table custom-table">
+                    <thead>
+                      <tr>
+                        <th>烘焙批次號</th>
+                        <th>烘焙日期</th>
+                        <th>生豆來源</th>
+                        <th>熟豆出爐重</th>
+                        <th>失重率</th>
+                        <th>備註</th>
+                      </tr>
+                    </thead>
+                    <tbody id="roast-records-body"></tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- Tab 2: 包耗材領用 -->
+              <div class="tab-pane fade" id="pane-material-usages" role="tabpanel">
+                <div class="d-flex justify-content-end mb-3">
+                  <button class="btn btn-custom-primary" id="btn-add-material-usage">
+                    <i class="bi bi-plus-circle-fill"></i> 新增領用紀錄
+                  </button>
+                </div>
+                <div class="table-responsive">
+                  <table class="table custom-table">
+                    <thead>
+                      <tr>
+                        <th>領用日期</th>
+                        <th>項目與單位</th>
+                        <th>領用類型</th>
+                        <th>數量</th>
+                        <th>備註</th>
+                      </tr>
+                    </thead>
+                    <tbody id="material-usages-body"></tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- Tab 3: 庫存歷程 -->
+              <div class="tab-pane fade" id="pane-stock-logs" role="tabpanel">
+                <div class="table-responsive">
+                  <table class="table custom-table">
+                    <thead>
+                      <tr>
+                        <th>異動時間</th>
+                        <th>物料類型</th>
+                        <th>品項名稱 (批號)</th>
+                        <th>異動類型</th>
+                        <th>異動數量</th>
+                        <th>備註</th>
+                      </tr>
+                    </thead>
+                    <tbody id="stock-logs-body"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div> <!-- Closed section-inventory -->
 
         <!-- ── 訂購方式管理區塊 ── -->
         <div id="section-ordering" class="d-none">
@@ -629,6 +743,113 @@
               <span id="btn-save-spinner" class="spinner-border spinner-border-sm d-none" role="status"
                 aria-hidden="true"></span>
             </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 新增烘豆出庫紀錄 Modal ===== -->
+  <div class="modal fade" id="add-roast-record-modal" data-bs-backdrop="static" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content modal-content-custom">
+        <div class="modal-header modal-header-custom">
+          <h5 class="modal-title modal-title-custom"><i class="bi bi-fire text-danger me-2"></i>新增烘豆紀錄</h5>
+          <button type="button" class="btn-close btn-close-white-custom" data-bs-dismiss="modal"></button>
+        </div>
+        <form id="add-roast-record-form" novalidate>
+          <div class="modal-body p-4">
+            <div class="row g-3 mb-3">
+              <div class="col-12 col-md-6">
+                <label class="form-label form-label-custom">烘焙批次號 (自動產生)</label>
+                <input type="text" class="form-control form-control-custom" id="roast-batch-no" readonly>
+              </div>
+              <div class="col-12 col-md-6">
+                <label class="form-label form-label-custom">烘焙日期 <span class="text-danger">*</span></label>
+                <input type="date" class="form-control form-control-custom" id="roast-date" required>
+              </div>
+            </div>
+            <div class="row g-3 mb-3">
+              <div class="col-12">
+                <label class="form-label form-label-custom">選擇生豆批號 <span class="text-danger">*</span></label>
+                <select class="form-select form-control-custom" id="roast-green-bean-select" required>
+                  <option value="">載入中...</option>
+                </select>
+                <div class="text-info mt-1 fs-8" id="roast-green-bean-info"></div>
+              </div>
+            </div>
+            <div class="row g-3 mb-3">
+              <div class="col-4">
+                <label class="form-label form-label-custom">投入總重 (g) <span class="text-danger">*</span></label>
+                <input type="number" class="form-control form-control-custom" id="roast-green-weight" min="1" step="any" required>
+              </div>
+              <div class="col-4">
+                <label class="form-label form-label-custom">出爐熟豆重 (g) <span class="text-danger">*</span></label>
+                <input type="number" class="form-control form-control-custom" id="roast-roasted-weight" min="1" step="any" required>
+              </div>
+              <div class="col-4">
+                <label class="form-label form-label-custom">失重率 (%)</label>
+                <input type="text" class="form-control form-control-custom text-warning" id="roast-loss-rate" readonly>
+                <div class="fs-8 mt-1 fw-bold" id="roast-loss-rate-warning"></div>
+              </div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label form-label-custom">備註</label>
+              <input type="text" class="form-control form-control-custom" id="roast-note" placeholder="烘焙備註、風味紀錄...">
+            </div>
+          </div>
+          <div class="modal-footer modal-footer-custom">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">取消</button>
+            <button type="submit" class="btn btn-custom-primary" id="btn-save-roast-record">確認送出</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 新增包材/耗材領用 Modal ===== -->
+  <div class="modal fade" id="add-material-usage-modal" data-bs-backdrop="static" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content modal-content-custom">
+        <div class="modal-header modal-header-custom">
+          <h5 class="modal-title modal-title-custom"><i class="bi bi-box-seam text-info me-2"></i>新增包材/耗材領用</h5>
+          <button type="button" class="btn-close btn-close-white-custom" data-bs-dismiss="modal"></button>
+        </div>
+        <form id="add-material-usage-form" novalidate>
+          <div class="modal-body p-4">
+            <div class="mb-3">
+              <label class="form-label form-label-custom">選擇物料項目 <span class="text-danger">*</span></label>
+              <select class="form-select form-control-custom" id="usage-material-select" required>
+                <option value="">載入中...</option>
+              </select>
+              <div class="text-info mt-1 fs-8" id="usage-material-info"></div>
+            </div>
+            <div class="row g-3 mb-3">
+              <div class="col-12 col-md-6">
+                <label class="form-label form-label-custom">領用日期 <span class="text-danger">*</span></label>
+                <input type="date" class="form-control form-control-custom" id="usage-date" required>
+              </div>
+              <div class="col-12 col-md-6">
+                <label class="form-label form-label-custom">數量 <span class="text-danger">*</span></label>
+                <input type="number" class="form-control form-control-custom" id="usage-quantity" min="1" step="any" required>
+              </div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label form-label-custom">領用類型 <span class="text-danger">*</span></label>
+              <select class="form-select form-control-custom" id="usage-type" required>
+                <option value="usage">正常領用</option>
+                <option value="loss">損耗/報廢</option>
+                <option value="adjust">盤點調整</option>
+              </select>
+            </div>
+            <div class="mb-3">
+              <label class="form-label form-label-custom">備註</label>
+              <input type="text" class="form-control form-control-custom" id="usage-note">
+            </div>
+          </div>
+          <div class="modal-footer modal-footer-custom">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">取消</button>
+            <button type="submit" class="btn btn-custom-primary" id="btn-save-material-usage">確認送出</button>
           </div>
         </form>
       </div>

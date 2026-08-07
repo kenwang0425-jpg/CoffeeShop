@@ -25,6 +25,7 @@
   const menuOrders        = $('menu-orders');
   const menuSuppliers     = $('menu-suppliers');
   const menuPurchases     = $('menu-purchases');
+  const menuInventory     = $('menu-inventory');
 
   // 內容區塊
   const sectionProducts      = $('section-products');
@@ -33,6 +34,7 @@
   const sectionOrders        = $('section-orders');
   const sectionSuppliers     = $('section-suppliers');
   const sectionPurchases     = $('section-purchases');
+  const sectionInventory     = $('section-inventory');
 
   // 標題
   const pageTitle    = document.querySelector('.page-title');
@@ -130,6 +132,8 @@
   let roastModalBS   = null;
   let supplierModalBS = null;
   let purchaseModalBS = null;
+  let addRoastRecordModalBS = null;
+  let addMaterialUsageModalBS = null;
 
   // ════════════════════════════════════════════════════
   //  State
@@ -198,9 +202,9 @@
   // ════════════════════════════════════════════════════
   function switchSection(section) {
     // 隱藏全部區塊
-    [sectionProducts, sectionOrdering, sectionBusinessHours, sectionOrders, sectionSuppliers, sectionPurchases]
+    [sectionProducts, sectionOrdering, sectionBusinessHours, sectionOrders, sectionSuppliers, sectionPurchases, sectionInventory]
       .forEach(s => { if (s) s.classList.add('d-none'); });
-    [menuProducts, menuOrdering, menuBusinessHours, menuOrders, menuSuppliers, menuPurchases]
+    [menuProducts, menuOrdering, menuBusinessHours, menuOrders, menuSuppliers, menuPurchases, menuInventory]
       .forEach(m => { if (m) m.classList.remove('active'); });
 
     // 離開訂單頁時停止輪詢
@@ -257,6 +261,14 @@
       
       loadSupplierOptions();
       loadPurchases();
+    } else if (section === 'inventory') {
+      if (sectionInventory) sectionInventory.classList.remove('d-none');
+      if (menuInventory) menuInventory.classList.add('active');
+      if (pageTitle) pageTitle.textContent = '庫存與烘豆管理';
+      loadInventoryOverview();
+      loadRoastRecords();
+      loadMaterialUsages();
+      loadStockLogs();
     }
   }
 
@@ -266,6 +278,7 @@
   if (menuOrders) menuOrders.querySelector('a').addEventListener('click', e => { e.preventDefault(); switchSection('orders'); });
   if (menuSuppliers) menuSuppliers.querySelector('a').addEventListener('click', e => { e.preventDefault(); switchSection('suppliers'); });
   if (menuPurchases) menuPurchases.querySelector('a').addEventListener('click', e => { e.preventDefault(); switchSection('purchases'); });
+  if (menuInventory) menuInventory.querySelector('a').addEventListener('click', e => { e.preventDefault(); switchSection('inventory'); });
 
   // ════════════════════════════════════════════════════
   //  登出
@@ -2149,6 +2162,311 @@
   if ($('purchase-form')) $('purchase-form').addEventListener('submit', savePurchase);
 
   // ════════════════════════════════════════════════════
+  //  庫存與烘豆管理 (Inventory & Roast Management)
+  // ════════════════════════════════════════════════════
+
+  async function loadInventoryOverview() {
+    try {
+      const res = await apiFetch('/api/inventory/overview');
+      const tbody = $('inventory-overview-body');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+      if (!res.data || res.data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-4">無庫存資料</td></tr>';
+        return;
+      }
+      res.data.forEach(item => {
+        let badgeClass = 'bg-secondary';
+        if (item.item_type === '生豆') badgeClass = 'bg-success';
+        else if (item.item_type === '包材') badgeClass = 'bg-info text-dark';
+        else if (item.item_type === '耗材') badgeClass = 'bg-warning text-dark';
+        
+        tbody.innerHTML += `
+          <tr>
+            <td><span class="badge ${badgeClass}">${escHtml(item.item_type)}</span></td>
+            <td class="fw-bold">${escHtml(item.item_name)}</td>
+            <td class="fs-5 ${item.total_remaining > 0 ? 'text-primary' : 'text-danger'}">${item.total_remaining}</td>
+            <td>${escHtml(item.unit)}</td>
+          </tr>
+        `;
+      });
+    } catch (err) {
+      console.error(err);
+      showAlert('載入庫存總覽失敗', 'danger');
+    }
+  }
+
+  async function loadRoastRecords() {
+    try {
+      const res = await apiFetch('/api/inventory/roasts');
+      const tbody = $('roast-records-body');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+      if (!res.data || res.data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">無歷史烘豆紀錄</td></tr>';
+        return;
+      }
+      res.data.forEach(r => {
+        const rateClass = r.weight_loss_rate < 10 || r.weight_loss_rate > 25 ? 'text-danger' : 'text-success';
+        tbody.innerHTML += `
+          <tr>
+            <td>${escHtml(r.roast_batch_no)}</td>
+            <td>${new Date(r.roast_date).toLocaleDateString()}</td>
+            <td>
+              ${(r.sources || []).map(s => `<div>${escHtml(s.item_name)} (${escHtml(s.batch_no)}) - ${s.used_weight}g</div>`).join('')}
+            </td>
+            <td>${r.roasted_weight}g</td>
+            <td class="${rateClass}">${r.weight_loss_rate}%</td>
+            <td>${escHtml(r.note || '')}</td>
+          </tr>
+        `;
+      });
+    } catch (err) {
+      console.error(err);
+      showAlert('載入烘豆紀錄失敗', 'danger');
+    }
+  }
+
+  async function loadMaterialUsages() {
+    try {
+      const res = await apiFetch('/api/inventory/usages');
+      const tbody = $('material-usages-body');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+      if (!res.data || res.data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">無領用紀錄</td></tr>';
+        return;
+      }
+      const typeMap = { 'usage': '正常領用', 'loss': '損耗/報廢', 'adjust': '盤點調整' };
+      res.data.forEach(u => {
+        tbody.innerHTML += `
+          <tr>
+            <td>${new Date(u.usage_date).toLocaleDateString()}</td>
+            <td>${escHtml(u.item_name)} (${escHtml(u.unit || '-')})</td>
+            <td><span class="badge bg-secondary">${typeMap[u.usage_type] || u.usage_type}</span></td>
+            <td>${u.quantity}</td>
+            <td>${escHtml(u.note || '')}</td>
+          </tr>
+        `;
+      });
+    } catch (err) {
+      console.error(err);
+      showAlert('載入包材領用紀錄失敗', 'danger');
+    }
+  }
+
+  async function loadStockLogs() {
+    try {
+      const res = await apiFetch('/api/inventory/logs');
+      const tbody = $('stock-logs-body');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+      if (!res.data || res.data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">無異動歷程</td></tr>';
+        return;
+      }
+      res.data.forEach(l => {
+        const lt = l.log_type || '';
+        const typeBadge = lt.includes('出庫') || lt.includes('領用') || lt.includes('扣減') 
+          ? '<span class="badge bg-danger">出</span>'
+          : '<span class="badge bg-success">入</span>';
+        const qtyColor = l.quantity_change > 0 ? 'text-success' : 'text-danger';
+        const qtySign = l.quantity_change > 0 ? '+' : '';
+        tbody.innerHTML += `
+          <tr>
+            <td>${new Date(l.created_at).toLocaleString()}</td>
+            <td>${escHtml(l.item_type || '-')}</td>
+            <td>${l.item_name ? escHtml(l.item_name) + ' (' + escHtml(l.batch_no) + ')' : '-'}</td>
+            <td>${typeBadge} ${escHtml(l.log_type)}</td>
+            <td class="${qtyColor} fw-bold">${qtySign}${l.quantity_change}</td>
+            <td>${escHtml(l.note || '')}</td>
+          </tr>
+        `;
+      });
+    } catch (err) {
+      console.error(err);
+      showAlert('載入庫存歷程失敗', 'danger');
+    }
+  }
+
+  // 新增烘豆紀錄 - 打開 Modal
+  if ($('btn-add-roast-record')) {
+    $('btn-add-roast-record').addEventListener('click', async () => {
+      $('add-roast-record-form').reset();
+      const now = new Date();
+      const y = now.getFullYear();
+      const m = String(now.getMonth() + 1).padStart(2, '0');
+      const d = String(now.getDate()).padStart(2, '0');
+      $('roast-date').value = `${y}-${m}-${d}`;
+      $('roast-batch-no').value = `RB${y}${m}${d}-${Math.floor(10 + Math.random() * 90)}`;
+      $('roast-loss-rate').value = '';
+      $('roast-loss-rate-warning').textContent = '';
+      
+      const sel = $('roast-green-bean-select');
+      sel.innerHTML = '<option value="">載入中...</option>';
+      $('roast-green-bean-info').textContent = '';
+      
+      try {
+        const res = await apiFetch('/api/inventory/green-beans');
+        if (res.data.length === 0) {
+          sel.innerHTML = '<option value="">(無可用生豆庫存)</option>';
+        } else {
+          sel.innerHTML = '<option value="">-- 請選擇生豆批號 --</option>' + res.data.map(gb => 
+            `<option value="${gb.id}" data-remain="${gb.remaining_quantity}" data-unit="${gb.unit}">
+              ${escHtml(gb.item_name)} (${escHtml(gb.batch_no)}) - 剩餘: ${gb.remaining_quantity}${gb.unit}
+            </option>`
+          ).join('');
+        }
+      } catch (err) {
+        sel.innerHTML = '<option value="">載入失敗</option>';
+      }
+      
+      if (addRoastRecordModalBS) addRoastRecordModalBS.show();
+    });
+  }
+
+  if ($('roast-green-bean-select')) {
+    $('roast-green-bean-select').addEventListener('change', (e) => {
+      const opt = e.target.options[e.target.selectedIndex];
+      const info = $('roast-green-bean-info');
+      if (opt && opt.value) {
+        info.textContent = `目前剩餘：${opt.dataset.remain} ${opt.dataset.unit}`;
+      } else {
+        info.textContent = '';
+      }
+    });
+  }
+
+  // 計算失重率
+  function calcLossRate() {
+    const gw = parseFloat($('roast-green-weight')?.value || 0);
+    const rw = parseFloat($('roast-roasted-weight')?.value || 0);
+    const rateEl = $('roast-loss-rate');
+    const warningEl = $('roast-loss-rate-warning');
+    if (gw > 0 && rw > 0) {
+      const rate = ((gw - rw) / gw * 100).toFixed(2);
+      rateEl.value = rate;
+      if (rate < 10) {
+        warningEl.textContent = '⚠️ 失重率偏低 (< 10%)';
+        warningEl.className = 'fs-8 mt-1 fw-bold text-danger';
+      } else if (rate > 25) {
+        warningEl.textContent = '⚠️ 失重率偏高 (> 25%)';
+        warningEl.className = 'fs-8 mt-1 fw-bold text-danger';
+      } else {
+        warningEl.textContent = '✅ 正常範圍 (10% - 25%)';
+        warningEl.className = 'fs-8 mt-1 fw-bold text-success';
+      }
+    } else {
+      rateEl.value = '';
+      warningEl.textContent = '';
+    }
+  }
+
+  if ($('roast-green-weight')) $('roast-green-weight').addEventListener('input', calcLossRate);
+  if ($('roast-roasted-weight')) $('roast-roasted-weight').addEventListener('input', calcLossRate);
+
+  if ($('add-roast-record-form')) {
+    $('add-roast-record-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const payload = {
+        roast_batch_no: $('roast-batch-no').value,
+        roast_date: $('roast-date').value,
+        total_green_weight: parseFloat($('roast-green-weight').value),
+        roasted_weight: parseFloat($('roast-roasted-weight').value),
+        weight_loss_rate: parseFloat($('roast-loss-rate').value),
+        note: $('roast-note').value.trim(),
+        sources: [
+          {
+            purchase_item_id: parseInt($('roast-green-bean-select').value),
+            used_weight: parseFloat($('roast-green-weight').value)
+          }
+        ]
+      };
+      
+      try {
+        await apiFetch('/api/inventory/roasts', {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        });
+        showAlert('烘豆紀錄建立成功！', 'success');
+        addRoastRecordModalBS.hide();
+        loadRoastRecords();
+        loadStockLogs();
+      } catch (err) {
+        showAlert(err.message, 'danger');
+      }
+    });
+  }
+
+  // 新增包材耗材領用 - 打開 Modal
+  if ($('btn-add-material-usage')) {
+    $('btn-add-material-usage').addEventListener('click', async () => {
+      $('add-material-usage-form').reset();
+      const now = new Date();
+      $('usage-date').value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      
+      const sel = $('usage-material-select');
+      sel.innerHTML = '<option value="">載入中...</option>';
+      $('usage-material-info').textContent = '';
+      
+      try {
+        const res = await apiFetch('/api/inventory/materials');
+        if (res.data.length === 0) {
+          sel.innerHTML = '<option value="">(無可用包耗材庫存)</option>';
+        } else {
+          sel.innerHTML = '<option value="">-- 請選擇包耗材 --</option>' + res.data.map(m => 
+            `<option value="${m.id}" data-remain="${m.remaining_quantity}" data-unit="${m.unit}">
+              [${escHtml(m.item_type)}] ${escHtml(m.item_name)} - 剩餘: ${m.remaining_quantity}${m.unit}
+            </option>`
+          ).join('');
+        }
+      } catch (err) {
+        sel.innerHTML = '<option value="">載入失敗</option>';
+      }
+      
+      if (addMaterialUsageModalBS) addMaterialUsageModalBS.show();
+    });
+  }
+
+  if ($('usage-material-select')) {
+    $('usage-material-select').addEventListener('change', (e) => {
+      const opt = e.target.options[e.target.selectedIndex];
+      const info = $('usage-material-info');
+      if (opt && opt.value) {
+        info.textContent = `目前剩餘：${opt.dataset.remain} ${opt.dataset.unit}`;
+      } else {
+        info.textContent = '';
+      }
+    });
+  }
+
+  if ($('add-material-usage-form')) {
+    $('add-material-usage-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const payload = {
+        purchase_item_id: parseInt($('usage-material-select').value),
+        usage_type: $('usage-type').value,
+        quantity: parseFloat($('usage-quantity').value),
+        usage_date: $('usage-date').value,
+        note: $('usage-note').value.trim()
+      };
+      
+      try {
+        await apiFetch('/api/inventory/usages', {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        });
+        showAlert('領用扣減成功！', 'success');
+        addMaterialUsageModalBS.hide();
+        loadMaterialUsages();
+        loadStockLogs();
+      } catch (err) {
+        showAlert(err.message, 'danger');
+      }
+    });
+  }
+
+  // ════════════════════════════════════════════════════
   //  工具函式
   // ════════════════════════════════════════════════════
   function escHtml(str) {
@@ -2167,11 +2485,15 @@
     const roastModalEl   = $('roast-modal');
     const supplierModalEl = $('supplier-modal');
     const purchaseModalEl = $('purchase-modal');
+    const addRoastModalEl = $('add-roast-record-modal');
+    const addUsageModalEl = $('add-material-usage-modal');
     if (productModalEl) productModalBS = new bootstrap.Modal(productModalEl);
     if (deleteModalEl)  deleteModalBS  = new bootstrap.Modal(deleteModalEl);
     if (roastModalEl)   roastModalBS   = new bootstrap.Modal(roastModalEl);
     if (supplierModalEl) supplierModalBS = new bootstrap.Modal(supplierModalEl);
     if (purchaseModalEl) purchaseModalBS = new bootstrap.Modal(purchaseModalEl);
+    if (addRoastModalEl) addRoastRecordModalBS = new bootstrap.Modal(addRoastModalEl);
+    if (addUsageModalEl) addMaterialUsageModalBS = new bootstrap.Modal(addUsageModalEl);
 
     initUserInfo();
     loadProducts(); // 預設顯示商品管理
