@@ -27,7 +27,8 @@ router.get('/materials', async (req, res) => {
 // 3. 取得歷史烘豆紀錄
 router.get('/roasts', async (req, res) => {
   try {
-    const data = await db.getRoastRecords();
+    const { year, month } = req.query;
+    const data = await db.getRoastRecords(year, month);
     res.json({ success: true, data });
   } catch (err) {
     console.error('取得烘豆紀錄失敗:', err);

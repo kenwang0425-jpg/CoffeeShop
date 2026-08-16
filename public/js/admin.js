@@ -266,6 +266,7 @@
       if (menuInventory) menuInventory.classList.add('active');
       if (pageTitle) pageTitle.textContent = '庫存與烘豆管理';
       loadInventoryOverview();
+      renderRoastMonthLabel();
       loadRoastRecords();
       loadMaterialUsages();
       loadStockLogs();
@@ -1793,8 +1794,7 @@
         <td class="fw-bold align-middle">${escHtml(p.id)}</td>
         <td class="align-middle">${escHtml(p.purchase_date.substring(0, 10))}</td>
         <td class="align-middle">${escHtml(p.supplier_name || '無')}</td>
-        <td class="align-middle"><span class="badge bg-secondary text-light">${escHtml(types || '無')}</span></td>
-        <td class="align-middle fw-bold">${items.length} 項</td>
+        <td class="align-middle text-muted">${escHtml(p.note || '-')}</td>
         <td class="align-middle text-warning fw-bold">$${totalAmount}</td>
         <td class="align-middle">${statusBadge}</td>
         <td class="align-middle text-center">
@@ -2148,6 +2148,257 @@
     }
   }
 
+  // ────────────────────────────────────────────────────────
+  //  新增烘豆紀錄：多批次生豆來源動態列管理
+  // ────────────────────────────────────────────────────────
+  let availableGreenBeans = [];   // 從 API 取回的可用生豆清單
+
+  /** 建立單条生豆列 HTML 元素 */
+  function createSourceRow() {
+    const row = document.createElement('div');
+    row.className = 'roast-source-row d-flex gap-2 align-items-start mb-2';
+    row.dataset.rowid = Date.now() + Math.random();
+
+    // 生豆選單
+    const sel = document.createElement('select');
+    sel.className = 'form-select form-control-custom flex-grow-1';
+    sel.innerHTML = availableGreenBeans.length
+      ? '<option value="">— 請選擇生豆批號 —</option>' +
+        availableGreenBeans.map(gb =>
+          `<option value="${gb.id}" data-remaining="${gb.remaining_quantity}">
+            ${escHtml(gb.item_name)} [${escHtml(gb.batch_no || '-')}] ― 剩餘 ${Number(gb.remaining_quantity).toFixed(2)} kg
+          </option>`
+        ).join('')
+      : '<option value="">（無可用生豆庫存）</option>';
+
+    // 公克輸入框
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.className = 'form-control form-control-custom';
+    input.style.width = '140px';
+    input.style.flexShrink = '0';
+    input.min = '1';
+    input.step = '1';
+    input.placeholder = '扣減公克 (g)';
+
+    // 庫存警示文字
+    const hint = document.createElement('div');
+    hint.className = 'text-danger small mt-1 d-none';
+    hint.textContent = '超過庫存量';
+
+    // 別除按鈕
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'btn btn-outline-danger btn-sm';
+    del.style.flexShrink = '0';
+    del.innerHTML = '<i class="bi bi-trash"></i>';
+    del.addEventListener('click', () => {
+      const container = document.getElementById('roast-sources-container');
+      if (container && container.querySelectorAll('.roast-source-row').length > 1) {
+        row.remove();
+        recalcTotalGreenWeight();
+      } else {
+        showAlert('至少需保留一批生豆來源。', 'warning');
+      }
+    });
+
+    // 公克輸入防呡：比對對應選單的 remaining_quantity (kg) * 1000
+    input.addEventListener('input', () => {
+      const opt = sel.options[sel.selectedIndex];
+      const remaining_kg = opt && opt.value ? parseFloat(opt.dataset.remaining || 0) : 0;
+      const remaining_g = remaining_kg * 1000;
+      const val = parseFloat(input.value || 0);
+      if (val > 0 && remaining_g > 0 && val > remaining_g) {
+        input.classList.add('is-invalid');
+        hint.classList.remove('d-none');
+        hint.textContent = `超過庫存量（剩 ${remaining_g.toFixed(0)} g）`;
+      } else {
+        input.classList.remove('is-invalid');
+        hint.classList.add('d-none');
+      }
+      recalcTotalGreenWeight();
+    });
+
+    // 選單變動時重新驗證
+    sel.addEventListener('change', () => {
+      input.dispatchEvent(new Event('input'));
+    });
+
+    // 包裝 wrapper（選單 + hint）
+    const selWrapper = document.createElement('div');
+    selWrapper.className = 'flex-grow-1';
+    selWrapper.appendChild(sel);
+    selWrapper.appendChild(hint);
+
+    row.appendChild(selWrapper);
+    row.appendChild(input);
+    row.appendChild(del);
+    return row;
+  }
+
+  /** 自動累加所有列的公克數入「投入總重」 */
+  function recalcTotalGreenWeight() {
+    const rows = document.querySelectorAll('#roast-sources-container .roast-source-row');
+    let total = 0;
+    rows.forEach(r => {
+      const inp = r.querySelector('input[type="number"]');
+      const v = parseFloat(inp?.value || 0);
+      if (!isNaN(v) && v > 0) total += v;
+    });
+    const gwEl = document.getElementById('roast-green-weight');
+    if (gwEl) gwEl.value = total > 0 ? total : '';
+    calcLossRate();
+  }
+
+  /** 計算失重率 */
+  function calcLossRate() {
+    const gw = parseFloat(document.getElementById('roast-green-weight')?.value || 0);
+    const rw = parseFloat(document.getElementById('roast-roasted-weight')?.value || 0);
+    const rateEl = document.getElementById('roast-loss-rate');
+    const warningEl = document.getElementById('roast-loss-rate-warning');
+    if (!rateEl || !warningEl) return;
+    if (gw > 0 && rw > 0) {
+      const rate = ((gw - rw) / gw * 100).toFixed(2);
+      rateEl.value = rate;
+      if (rate < 10) {
+        warningEl.textContent = '⚠️ 失重率偏低 (< 10%)';
+        warningEl.className = 'fs-8 mt-1 fw-bold text-danger';
+      } else if (rate > 25) {
+        warningEl.textContent = '⚠️ 失重率偏高 (> 25%)';
+        warningEl.className = 'fs-8 mt-1 fw-bold text-danger';
+      } else {
+        warningEl.textContent = '✅ 正常範圍 (10% - 25%)';
+        warningEl.className = 'fs-8 mt-1 fw-bold text-success';
+      }
+    } else {
+      rateEl.value = '';
+      warningEl.textContent = '';
+    }
+  }
+
+  const roastedWeightEl = document.getElementById('roast-roasted-weight');
+  if (roastedWeightEl) roastedWeightEl.addEventListener('input', calcLossRate);
+
+  // 「新增生豆批次」按鈕
+  const btnAddRoastSource = document.getElementById('btn-add-roast-source');
+  if (btnAddRoastSource) {
+    btnAddRoastSource.addEventListener('click', () => {
+      const container = document.getElementById('roast-sources-container');
+      if (container) container.appendChild(createSourceRow());
+    });
+  }
+
+  // 月份切換按鈕
+  const btnPrevRoastMonth = document.getElementById('btn-roast-prev-month');
+  const btnNextRoastMonth = document.getElementById('btn-roast-next-month');
+  if (btnPrevRoastMonth) {
+    btnPrevRoastMonth.addEventListener('click', () => {
+      currentRoastMonth--;
+      if (currentRoastMonth < 1) { currentRoastMonth = 12; currentRoastYear--; }
+      renderRoastMonthLabel();
+      loadRoastRecords();
+    });
+  }
+  if (btnNextRoastMonth) {
+    btnNextRoastMonth.addEventListener('click', () => {
+      currentRoastMonth++;
+      if (currentRoastMonth > 12) { currentRoastMonth = 1; currentRoastYear++; }
+      renderRoastMonthLabel();
+      loadRoastRecords();
+    });
+  }
+
+  // 開啟 Modal
+  if ($('btn-add-roast-record')) {
+    $('btn-add-roast-record').addEventListener('click', async () => {
+      $('add-roast-record-form').reset();
+      const now = new Date();
+      const y = now.getFullYear();
+      const m = String(now.getMonth() + 1).padStart(2, '0');
+      const d = String(now.getDate()).padStart(2, '0');
+      $('roast-date').value = `${y}-${m}-${d}`;
+      $('roast-batch-no').value = `RB${y}${m}${d}-${Math.floor(10 + Math.random() * 90)}`;
+      $('roast-loss-rate').value = '';
+      $('roast-loss-rate-warning').textContent = '';
+
+      // 清空生豆容器
+      const container = document.getElementById('roast-sources-container');
+      if (container) container.innerHTML = '';
+
+      // 載入可用生豆
+      try {
+        const res = await apiFetch('/api/inventory/green-beans');
+        availableGreenBeans = res.data || [];
+      } catch (err) {
+        availableGreenBeans = [];
+        showAlert('生豆清單載入失敗：' + err.message, 'warning');
+      }
+
+      // 預設產生 1 列
+      if (container) container.appendChild(createSourceRow());
+
+      if (addRoastRecordModalBS) addRoastRecordModalBS.show();
+    });
+  }
+
+  // 送出表單
+  if ($('add-roast-record-form')) {
+    $('add-roast-record-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      // 收集各列資料，並將 g 轉換為 kg
+      const rows = document.querySelectorAll('#roast-sources-container .roast-source-row');
+      const sources = [];
+      let valid = true;
+      rows.forEach(row => {
+        const sel = row.querySelector('select');
+        const inp = row.querySelector('input[type="number"]');
+        const pid = parseInt(sel?.value);
+        const grams = parseFloat(inp?.value || 0);
+        if (!pid || grams <= 0) { valid = false; return; }
+        if (inp.classList.contains('is-invalid')) { valid = false; return; }
+        sources.push({ purchase_item_id: pid, used_weight: +(grams / 1000).toFixed(4) });
+      });
+
+      if (!valid || sources.length === 0) {
+        showAlert('請確認所有生豆批次均已選擇且公克數 > 0，且未超出庫存。', 'danger');
+        return;
+      }
+
+      const totalGreenWeightGrams = parseFloat($('roast-green-weight').value);
+      const roastedWeightGrams    = parseFloat($('roast-roasted-weight').value);
+
+      if (!totalGreenWeightGrams || !roastedWeightGrams) {
+        showAlert('請確認投入總重與出爐營豆重均已填寫。', 'danger');
+        return;
+      }
+
+      const lossRate = parseFloat($('roast-loss-rate').value) || 0;
+      const payload = {
+        roast_batch_no:    $('roast-batch-no').value,
+        roast_date:        $('roast-date').value,
+        total_green_weight: totalGreenWeightGrams,
+        roasted_weight:     roastedWeightGrams,
+        weight_loss_rate:   lossRate,
+        note:               $('roast-note').value.trim(),
+        sources
+      };
+
+      try {
+        await apiFetch('/api/inventory/roasts', {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        });
+        showAlert('烘豆紀錄建立成功！', 'success');
+        addRoastRecordModalBS.hide();
+        loadRoastRecords();
+        loadStockLogs();
+      } catch (err) {
+        showAlert(err.message, 'danger');
+      }
+    });
+  }
+
   if ($('btn-search-purchases')) $('btn-search-purchases').addEventListener('click', loadPurchases);
   if ($('btn-clear-purchase-dates')) {
     $('btn-clear-purchase-dates').addEventListener('click', () => {
@@ -2165,56 +2416,92 @@
   //  庫存與烘豆管理 (Inventory & Roast Management)
   // ════════════════════════════════════════════════════
 
+  let currentOverviewData = [];
+
+  if ($('overview-type-filter')) $('overview-type-filter').addEventListener('change', renderOverviewTable);
+  if ($('overview-keyword-filter')) $('overview-keyword-filter').addEventListener('input', renderOverviewTable);
+
   async function loadInventoryOverview() {
     try {
       const res = await apiFetch('/api/inventory/overview');
-      const tbody = $('inventory-overview-body');
-      if (!tbody) return;
-      tbody.innerHTML = '';
-      if (!res.data || res.data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-4">無庫存資料</td></tr>';
-        return;
-      }
-      res.data.forEach(item => {
-        let badgeClass = 'bg-secondary';
-        if (item.item_type === '生豆') badgeClass = 'bg-success';
-        else if (item.item_type === '包材') badgeClass = 'bg-info text-dark';
-        else if (item.item_type === '耗材') badgeClass = 'bg-warning text-dark';
-        
-        tbody.innerHTML += `
-          <tr>
-            <td><span class="badge ${badgeClass}">${escHtml(item.item_type)}</span></td>
-            <td class="fw-bold">${escHtml(item.item_name)}</td>
-            <td class="fs-5 ${item.total_remaining > 0 ? 'text-primary' : 'text-danger'}">${item.total_remaining}</td>
-            <td>${escHtml(item.unit)}</td>
-          </tr>
-        `;
-      });
+      currentOverviewData = res.data || [];
+      renderOverviewTable();
     } catch (err) {
       console.error(err);
       showAlert('載入庫存總覽失敗', 'danger');
     }
   }
 
+  function renderOverviewTable() {
+    const tbody = $('inventory-overview-body');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    const typeFilter = $('overview-type-filter') ? $('overview-type-filter').value : '';
+    const keywordFilter = $('overview-keyword-filter') ? $('overview-keyword-filter').value.toLowerCase().trim() : '';
+
+    const filteredData = currentOverviewData.filter(item => {
+      const matchType = typeFilter === '' || item.item_type === typeFilter;
+      const matchKeyword = keywordFilter === '' || item.item_name.toLowerCase().includes(keywordFilter);
+      return matchType && matchKeyword;
+    });
+
+    if (filteredData.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-4">無符合條件的庫存資料</td></tr>';
+      return;
+    }
+
+    filteredData.forEach(item => {
+      let badgeClass = 'bg-secondary';
+      if (item.item_type === '生豆') badgeClass = 'bg-success';
+      else if (item.item_type === '包材') badgeClass = 'bg-info text-dark';
+      else if (item.item_type === '耗材') badgeClass = 'bg-warning text-dark';
+      
+      tbody.innerHTML += `
+        <tr>
+          <td><span class="badge ${badgeClass}">${escHtml(item.item_type)}</span></td>
+          <td class="fw-bold">${escHtml(item.item_name)}</td>
+          <td class="fs-5 ${item.total_remaining > 0 ? 'text-primary' : 'text-danger'}">${item.total_remaining}</td>
+          <td>${escHtml(item.unit)}</td>
+        </tr>
+      `;
+    });
+  }
+
+  // ── 烘豆紀錄月份篩選器 ──
+  const _rNow = new Date();
+  let currentRoastYear  = _rNow.getFullYear();
+  let currentRoastMonth = _rNow.getMonth() + 1; // 1-12
+
+  function renderRoastMonthLabel() {
+    const label = document.getElementById('roast-current-month-label');
+    if (label) {
+      const m = String(currentRoastMonth).padStart(2, '0');
+      label.textContent = `📅 ${currentRoastYear} 年 ${m} 月`;
+    }
+  }
+
   async function loadRoastRecords() {
     try {
-      const res = await apiFetch('/api/inventory/roasts');
+      const res = await apiFetch(`/api/inventory/roasts?year=${currentRoastYear}&month=${currentRoastMonth}`);
       const tbody = $('roast-records-body');
       if (!tbody) return;
       tbody.innerHTML = '';
       if (!res.data || res.data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">無歷史烘豆紀錄</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">本月無烘豆紀錄</td></tr>';
         return;
       }
       res.data.forEach(r => {
         const rateClass = r.weight_loss_rate < 10 || r.weight_loss_rate > 25 ? 'text-danger' : 'text-success';
+        const sources = Array.isArray(r.sources) ? r.sources : [];
+        const sourcesHtml = sources.length
+          ? sources.map(s => `<div style="display:inline-block;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:2px 8px;margin:2px 2px 2px 0;font-size:0.82rem;color:#e2e8f0;white-space:nowrap;">${escHtml(s.item_name || '?')} <span style="color:#94a3b8;">[${escHtml(s.batch_no || '-')}]</span> <span style="color:#fbbf24;font-weight:600;">${(s.used_weight * 1000).toFixed(0)}g</span></div>`).join('')
+          : '<span style="color:#94a3b8;">-</span>';
         tbody.innerHTML += `
           <tr>
             <td>${escHtml(r.roast_batch_no)}</td>
-            <td>${new Date(r.roast_date).toLocaleDateString()}</td>
-            <td>
-              ${(r.sources || []).map(s => `<div>${escHtml(s.item_name)} (${escHtml(s.batch_no)}) - ${s.used_weight}g</div>`).join('')}
-            </td>
+            <td>${escHtml(r.roast_date ? r.roast_date.substring(0, 10) : '')}</td>
+            <td>${sourcesHtml}</td>
             <td>${r.roasted_weight}g</td>
             <td class="${rateClass}">${r.weight_loss_rate}%</td>
             <td>${escHtml(r.note || '')}</td>
@@ -2289,114 +2576,7 @@
     }
   }
 
-  // 新增烘豆紀錄 - 打開 Modal
-  if ($('btn-add-roast-record')) {
-    $('btn-add-roast-record').addEventListener('click', async () => {
-      $('add-roast-record-form').reset();
-      const now = new Date();
-      const y = now.getFullYear();
-      const m = String(now.getMonth() + 1).padStart(2, '0');
-      const d = String(now.getDate()).padStart(2, '0');
-      $('roast-date').value = `${y}-${m}-${d}`;
-      $('roast-batch-no').value = `RB${y}${m}${d}-${Math.floor(10 + Math.random() * 90)}`;
-      $('roast-loss-rate').value = '';
-      $('roast-loss-rate-warning').textContent = '';
-      
-      const sel = $('roast-green-bean-select');
-      sel.innerHTML = '<option value="">載入中...</option>';
-      $('roast-green-bean-info').textContent = '';
-      
-      try {
-        const res = await apiFetch('/api/inventory/green-beans');
-        if (res.data.length === 0) {
-          sel.innerHTML = '<option value="">(無可用生豆庫存)</option>';
-        } else {
-          sel.innerHTML = '<option value="">-- 請選擇生豆批號 --</option>' + res.data.map(gb => 
-            `<option value="${gb.id}" data-remain="${gb.remaining_quantity}" data-unit="${gb.unit}">
-              ${escHtml(gb.item_name)} (${escHtml(gb.batch_no)}) - 剩餘: ${gb.remaining_quantity}${gb.unit}
-            </option>`
-          ).join('');
-        }
-      } catch (err) {
-        sel.innerHTML = '<option value="">載入失敗</option>';
-      }
-      
-      if (addRoastRecordModalBS) addRoastRecordModalBS.show();
-    });
-  }
 
-  if ($('roast-green-bean-select')) {
-    $('roast-green-bean-select').addEventListener('change', (e) => {
-      const opt = e.target.options[e.target.selectedIndex];
-      const info = $('roast-green-bean-info');
-      if (opt && opt.value) {
-        info.textContent = `目前剩餘：${opt.dataset.remain} ${opt.dataset.unit}`;
-      } else {
-        info.textContent = '';
-      }
-    });
-  }
-
-  // 計算失重率
-  function calcLossRate() {
-    const gw = parseFloat($('roast-green-weight')?.value || 0);
-    const rw = parseFloat($('roast-roasted-weight')?.value || 0);
-    const rateEl = $('roast-loss-rate');
-    const warningEl = $('roast-loss-rate-warning');
-    if (gw > 0 && rw > 0) {
-      const rate = ((gw - rw) / gw * 100).toFixed(2);
-      rateEl.value = rate;
-      if (rate < 10) {
-        warningEl.textContent = '⚠️ 失重率偏低 (< 10%)';
-        warningEl.className = 'fs-8 mt-1 fw-bold text-danger';
-      } else if (rate > 25) {
-        warningEl.textContent = '⚠️ 失重率偏高 (> 25%)';
-        warningEl.className = 'fs-8 mt-1 fw-bold text-danger';
-      } else {
-        warningEl.textContent = '✅ 正常範圍 (10% - 25%)';
-        warningEl.className = 'fs-8 mt-1 fw-bold text-success';
-      }
-    } else {
-      rateEl.value = '';
-      warningEl.textContent = '';
-    }
-  }
-
-  if ($('roast-green-weight')) $('roast-green-weight').addEventListener('input', calcLossRate);
-  if ($('roast-roasted-weight')) $('roast-roasted-weight').addEventListener('input', calcLossRate);
-
-  if ($('add-roast-record-form')) {
-    $('add-roast-record-form').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const payload = {
-        roast_batch_no: $('roast-batch-no').value,
-        roast_date: $('roast-date').value,
-        total_green_weight: parseFloat($('roast-green-weight').value),
-        roasted_weight: parseFloat($('roast-roasted-weight').value),
-        weight_loss_rate: parseFloat($('roast-loss-rate').value),
-        note: $('roast-note').value.trim(),
-        sources: [
-          {
-            purchase_item_id: parseInt($('roast-green-bean-select').value),
-            used_weight: parseFloat($('roast-green-weight').value)
-          }
-        ]
-      };
-      
-      try {
-        await apiFetch('/api/inventory/roasts', {
-          method: 'POST',
-          body: JSON.stringify(payload)
-        });
-        showAlert('烘豆紀錄建立成功！', 'success');
-        addRoastRecordModalBS.hide();
-        loadRoastRecords();
-        loadStockLogs();
-      } catch (err) {
-        showAlert(err.message, 'danger');
-      }
-    });
-  }
 
   // 新增包材耗材領用 - 打開 Modal
   if ($('btn-add-material-usage')) {

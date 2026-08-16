@@ -1487,95 +1487,38 @@ async function deleteSupplier(id) {
 // ============================================================
 
 async function getPurchases(startDate, endDate, supplierId, supplierName) {
-  if (pool) {
-    try {
-      let query = "SELECT *, to_char(purchase_date, 'YYYY-MM-DD') AS purchase_date FROM purchases WHERE 1=1";
-      const params = [];
-      let paramIndex = 1;
-      
-      if (startDate) {
-        query += ` AND purchase_date::date >= $${paramIndex++}::date`;
-        params.push(startDate);
-      }
-      if (endDate) {
-        query += ` AND purchase_date::date <= $${paramIndex++}::date`;
-        params.push(endDate);
-      }
-      if (supplierId) {
-        if (!isNaN(supplierId) && !isNaN(parseFloat(supplierId))) {
-          const supRes = await pool.query('SELECT name FROM suppliers WHERE id = $1', [supplierId]);
-          let supName = '';
-          if (supRes.rows.length > 0) {
-            supName = supRes.rows[0].name.trim();
-          }
-          if (supName) {
-            query += ` AND (supplier_id = $${paramIndex} OR TRIM(supplier_name) ILIKE $${paramIndex+1})`;
-            params.push(supplierId, `%${supName}%`);
-            paramIndex += 2;
-          } else {
-            query += ` AND supplier_id = $${paramIndex++}`;
-            params.push(supplierId);
-          }
-        } else {
-          query += ` AND TRIM(supplier_name) ILIKE $${paramIndex++}`;
-          params.push(`%${String(supplierId).trim()}%`);
-        }
-      }
-      if (supplierName) {
-        query += ` AND TRIM(supplier_name) ILIKE $${paramIndex++}`;
-        params.push(`%${String(supplierName).trim()}%`);
-      }
-      
-      query += ' ORDER BY created_at DESC';
-      const result = await pool.query(query, params);
-      
-      // Fetch items for all purchases
-      const purchases = result.rows;
-      if (purchases.length > 0) {
-        const purchaseIds = purchases.map(p => p.id);
-        const itemsResult = await pool.query(
-          `SELECT * FROM purchase_items WHERE purchase_id = ANY($1)`,
-          [purchaseIds]
-        );
-        const itemsByPurchase = itemsResult.rows.reduce((acc, item) => {
-          if (!acc[item.purchase_id]) acc[item.purchase_id] = [];
-          acc[item.purchase_id].push(item);
-          return acc;
-        }, {});
-        
-        purchases.forEach(p => {
-          p.items = itemsByPurchase[p.id] || [];
-        });
-      }
-      
-      return purchases;
-    } catch (err) {
-      console.error('PostgreSQL getPurchases 錯誤:', err.message);
-    }
+  let sql = `
+    SELECT 
+      p.id,
+      p.supplier_id,
+      p.supplier_name,
+      TO_CHAR(p.purchase_date, 'YYYY-MM-DD') AS purchase_date,
+      p.total_amount,
+      p.status,
+      p.note,
+      p.created_at
+    FROM purchases p
+    WHERE 1=1
+  `;
+  const params = [];
+
+  if (startDate) {
+    params.push(startDate);
+    sql += ` AND p.purchase_date >= $${params.length}`;
   }
-  
-  // Mock fallback
-  let result = [...mockPurchases];
-  if (startDate) result = result.filter(p => p.purchase_date >= startDate);
-  if (endDate) result = result.filter(p => p.purchase_date <= endDate + ' 23:59:59');
-  if (supplierId) {
-    if (!isNaN(supplierId) && !isNaN(parseFloat(supplierId))) {
-      const mockSup = mockSuppliers.find(s => String(s.id) === String(supplierId));
-      const supName = mockSup ? mockSup.name.trim().toLowerCase() : '';
-      result = result.filter(p => 
-        String(p.supplier_id) === String(supplierId) || 
-        (supName && p.supplier_name && p.supplier_name.trim().toLowerCase().includes(supName))
-      );
-    } else {
-      const qName = String(supplierId).trim().toLowerCase();
-      result = result.filter(p => p.supplier_name && p.supplier_name.trim().toLowerCase().includes(qName));
-    }
+  if (endDate) {
+    params.push(endDate);
+    sql += ` AND p.purchase_date <= $${params.length}`;
   }
-  if (supplierName) {
-    const qName = String(supplierName).trim().toLowerCase();
-    result = result.filter(p => p.supplier_name && p.supplier_name.trim().toLowerCase().includes(qName));
+  if (supplierId && supplierId !== 'all' && supplierId !== '') {
+    params.push(supplierId);
+    sql += ` AND p.supplier_id = $${params.length}`;
   }
-  return result;
+
+  sql += ` ORDER BY p.purchase_date DESC, p.created_at DESC`;
+
+  const result = await pool.query(sql, params);
+  return result.rows;
 }
 
 async function getPurchaseByID(id) {
@@ -1786,21 +1729,53 @@ async function deletePurchase(id) {
 // ============================================================
 // Roast Records (烘豆紀錄)
 // ============================================================
-async function getRoastRecords() {
+async function getRoastRecords(year, month) {
   if (pool) {
     try {
-      const query = `
+      let query = `
         SELECT r.*,
-               json_agg(json_build_object(
-                 'purchase_item_id', s.purchase_item_id,
-                 'used_weight', s.used_weight
-               )) AS sources
+               TO_CHAR(r.roast_date, 'YYYY-MM-DD') AS roast_date,
+               COALESCE(
+                 json_agg(
+                   json_build_object(
+                     'purchase_item_id', s.purchase_item_id,
+                     'used_weight', s.used_weight,
+                     'item_name', pi.item_name,
+                     'batch_no', pi.batch_no
+                   )
+                 ) FILTER (WHERE s.id IS NOT NULL),
+                 '[]'
+               ) AS sources
         FROM roast_records r
         LEFT JOIN roast_item_sources s ON r.id = s.roast_id
-        GROUP BY r.id
-        ORDER BY r.created_at DESC
+        LEFT JOIN purchase_items pi ON s.purchase_item_id = pi.id
+        WHERE 1=1
       `;
-      const result = await pool.query(query);
+      const params = [];
+
+      if (year && month) {
+        const y = parseInt(year, 10);
+        const m = parseInt(month, 10);
+        if (!isNaN(y) && !isNaN(m) && m >= 1 && m <= 12) {
+          const mStr = String(m).padStart(2, '0');
+          const startDate = `${y}-${mStr}-01`;
+          const nextY = m === 12 ? y + 1 : y;
+          const nextM = m === 12 ? 1 : m + 1;
+          const nextMStr = String(nextM).padStart(2, '0');
+          const endDate = `${nextY}-${nextMStr}-01`;
+          params.push(startDate);
+          query += ` AND r.roast_date >= $${params.length}`;
+          params.push(endDate);
+          query += ` AND r.roast_date < $${params.length}`;
+        }
+      }
+
+      query += `
+        GROUP BY r.id
+        ORDER BY r.roast_date DESC, r.created_at DESC
+      `;
+
+      const result = await pool.query(query, params);
       return result.rows;
     } catch (err) {
       console.error('PostgreSQL getRoastRecords 錯誤:', err.message);

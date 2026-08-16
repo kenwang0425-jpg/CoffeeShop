@@ -264,11 +264,10 @@
                     <th style="width:15%">進貨單號</th>
                     <th style="width:12%">進貨日期</th>
                     <th style="width:18%">進貨商名稱</th>
-                    <th style="width:20%">物料類型摘要</th>
-                    <th style="width:10%">總品項數</th>
+                    <th style="width:25%">備註</th>
                     <th style="width:10%">總金額</th>
-                    <th style="width:8%">狀態</th>
-                    <th style="width:7%" class="text-center">操作</th>
+                    <th style="width:10%">狀態</th>
+                    <th style="width:10%" class="text-center">操作</th>
                   </tr>
                 </thead>
                 <tbody id="purchase-list-body"></tbody>
@@ -308,6 +307,20 @@
               
               <!-- Tab 0: 庫存總覽 -->
               <div class="tab-pane fade show active" id="pane-inventory-overview" role="tabpanel">
+                <div class="row mb-3">
+                  <div class="col-md-3">
+                    <select id="overview-type-filter" class="form-select">
+                      <option value="">全部</option>
+                      <option value="生豆">生豆</option>
+                      <option value="包材">包材</option>
+                      <option value="耗材">耗材</option>
+                      <option value="其他">其他</option>
+                    </select>
+                  </div>
+                  <div class="col-md-9">
+                    <input type="text" id="overview-keyword-filter" class="form-control" placeholder="搜尋品項名稱...">
+                  </div>
+                </div>
                 <div class="table-responsive">
                   <table class="table custom-table">
                     <thead>
@@ -325,7 +338,14 @@
 
               <!-- Tab 1: 烘豆紀錄 -->
               <div class="tab-pane fade" id="pane-roast-records" role="tabpanel">
-                <div class="d-flex justify-content-end mb-3">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                  <!-- 月份切換器 -->
+                  <div class="d-flex align-items-center gap-1 rounded-pill px-3 py-1" style="border:1px solid #4a4a6a;background:rgba(255,255,255,0.03);min-width:180px;">
+                    <button type="button" id="btn-roast-prev-month" class="btn btn-sm text-light p-0 border-0" style="font-size:1rem;line-height:1;">&lt;</button>
+                    <span id="roast-current-month-label" class="text-warning fw-bold mx-auto" style="font-size:0.9rem;white-space:nowrap;">📅 載入中</span>
+                    <button type="button" id="btn-roast-next-month" class="btn btn-sm text-light p-0 border-0" style="font-size:1rem;line-height:1;">&gt;</button>
+                  </div>
+                  <!-- 新增按鈕 -->
                   <button class="btn btn-custom-primary" id="btn-add-roast-record">
                     <i class="bi bi-plus-circle-fill"></i> 新增烘豆紀錄
                   </button>
@@ -769,19 +789,22 @@
                 <input type="date" class="form-control form-control-custom" id="roast-date" required>
               </div>
             </div>
-            <div class="row g-3 mb-3">
-              <div class="col-12">
-                <label class="form-label form-label-custom">選擇生豆批號 <span class="text-danger">*</span></label>
-                <select class="form-select form-control-custom" id="roast-green-bean-select" required>
-                  <option value="">載入中...</option>
-                </select>
-                <div class="text-info mt-1 fs-8" id="roast-green-bean-info"></div>
+            <!-- 生豆批次動態清單 -->
+            <div class="mb-3">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <label class="form-label form-label-custom mb-0">生豆來源批次 <span class="text-danger">*</span></label>
+                <button type="button" class="btn btn-sm btn-outline-warning" id="btn-add-roast-source">
+                  <i class="bi bi-plus-circle me-1"></i>新增生豆批次
+                </button>
+              </div>
+              <div id="roast-sources-container">
+                <!-- 動態生成的生豆列會插入此處 -->
               </div>
             </div>
             <div class="row g-3 mb-3">
               <div class="col-4">
                 <label class="form-label form-label-custom">投入總重 (g) <span class="text-danger">*</span></label>
-                <input type="number" class="form-control form-control-custom" id="roast-green-weight" min="1" step="any" required>
+                <input type="number" class="form-control form-control-custom bg-dark text-warning fw-bold" id="roast-green-weight" min="1" step="any" readonly placeholder="自動累加">
               </div>
               <div class="col-4">
                 <label class="form-label form-label-custom">出爐熟豆重 (g) <span class="text-danger">*</span></label>
