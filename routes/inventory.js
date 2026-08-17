@@ -50,7 +50,8 @@ router.post('/roasts', async (req, res) => {
 // 5. 取得包耗材領用紀錄
 router.get('/usages', async (req, res) => {
   try {
-    const data = await db.getMaterialUsages();
+    const { year, month } = req.query;
+    const data = await db.getMaterialUsages(year, month);
     res.json({ success: true, data });
   } catch (err) {
     console.error('取得領用紀錄失敗:', err);
@@ -72,7 +73,8 @@ router.post('/usages', async (req, res) => {
 // 7. 取得全物料庫存異動歷程
 router.get('/logs', async (req, res) => {
   try {
-    const data = await db.getStockLogs();
+    const { year, month } = req.query;
+    const data = await db.getStockLogs(year, month);
     res.json({ success: true, data });
   } catch (err) {
     console.error('取得庫存歷程失敗:', err);

@@ -152,6 +152,16 @@
   let currentOrderYear  = new Date().getFullYear();
   let currentOrderMonth = new Date().getMonth() + 1; // 1-12
 
+  // 包耗材領用 State
+  const _mNow = new Date();
+  let currentMaterialYear  = _mNow.getFullYear();
+  let currentMaterialMonth = _mNow.getMonth() + 1; // 1-12
+
+  // 庫存異動歷程 State
+  const _sNow = new Date();
+  let currentStockYear  = _sNow.getFullYear();
+  let currentStockMonth = _sNow.getMonth() + 1; // 1-12
+
   const DAY_NAMES = { 1: '星期一', 2: '星期二', 3: '星期三', 4: '星期四', 5: '星期五', 6: '星期六', 7: '星期日' };
 
 
@@ -268,7 +278,9 @@
       loadInventoryOverview();
       renderRoastMonthLabel();
       loadRoastRecords();
+      renderMaterialMonthLabel();
       loadMaterialUsages();
+      renderStockMonthLabel();
       loadStockLogs();
     }
   }
@@ -2514,21 +2526,30 @@
     }
   }
 
+  // ── 包耗材領用月份筛選器 ──
+  function renderMaterialMonthLabel() {
+    const label = document.getElementById('material-current-month-label');
+    if (label) {
+      const m = String(currentMaterialMonth).padStart(2, '0');
+      label.textContent = `📅 ${currentMaterialYear} 年 ${m} 月`;
+    }
+  }
+
   async function loadMaterialUsages() {
     try {
-      const res = await apiFetch('/api/inventory/usages');
+      const res = await apiFetch(`/api/inventory/usages?year=${currentMaterialYear}&month=${currentMaterialMonth}`);
       const tbody = $('material-usages-body');
       if (!tbody) return;
       tbody.innerHTML = '';
       if (!res.data || res.data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">無領用紀錄</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">本月無領用紀錄</td></tr>';
         return;
       }
       const typeMap = { 'usage': '正常領用', 'loss': '損耗/報廢', 'adjust': '盤點調整' };
       res.data.forEach(u => {
         tbody.innerHTML += `
           <tr>
-            <td>${new Date(u.usage_date).toLocaleDateString()}</td>
+            <td>${escHtml(u.usage_date || '')}</td>
             <td>${escHtml(u.item_name)} (${escHtml(u.unit || '-')})</td>
             <td><span class="badge bg-secondary">${typeMap[u.usage_type] || u.usage_type}</span></td>
             <td>${u.quantity}</td>
@@ -2542,31 +2563,77 @@
     }
   }
 
+  // 月份切換按鈕
+  const btnPrevMaterialMonth = document.getElementById('btn-material-prev-month');
+  const btnNextMaterialMonth = document.getElementById('btn-material-next-month');
+  if (btnPrevMaterialMonth) {
+    btnPrevMaterialMonth.addEventListener('click', () => {
+      currentMaterialMonth--;
+      if (currentMaterialMonth < 1) { currentMaterialMonth = 12; currentMaterialYear--; }
+      renderMaterialMonthLabel();
+      loadMaterialUsages();
+    });
+  }
+  if (btnNextMaterialMonth) {
+    btnNextMaterialMonth.addEventListener('click', () => {
+      currentMaterialMonth++;
+      if (currentMaterialMonth > 12) { currentMaterialMonth = 1; currentMaterialYear++; }
+      renderMaterialMonthLabel();
+      loadMaterialUsages();
+    });
+  }
+
+  function renderStockMonthLabel() {
+    const el = document.getElementById('stock-current-month-label');
+    if (el) el.textContent = `📅 ${currentStockYear} 年 ${String(currentStockMonth).padStart(2, '0')} 月`;
+  }
+
   async function loadStockLogs() {
     try {
-      const res = await apiFetch('/api/inventory/logs');
+      const res = await apiFetch(`/api/inventory/logs?year=${currentStockYear}&month=${currentStockMonth}`);
       const tbody = $('stock-logs-body');
       if (!tbody) return;
       tbody.innerHTML = '';
       if (!res.data || res.data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">無異動歷程</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">本月無異動歷程</td></tr>';
         return;
       }
+
+      // 備註代碼中文化
+      function localizeNote(note) {
+        if (!note) return '';
+        return note.replace(/\(usage\)/g, '(正常領用)').replace(/\(loss\)/g, '(損耗/報廢)').replace(/\(adjust\)/g, '(盤點調整)');
+      }
+
       res.data.forEach(l => {
-        const lt = l.log_type || '';
-        const typeBadge = lt.includes('出庫') || lt.includes('領用') || lt.includes('扣減') 
+        const amount = Number(l.change_amount || 0);
+        const changeType = l.change_type || '';
+        // 出入判斷：負數或含 out 為出；正數或含 in 為入
+        const isOut = amount < 0 || changeType.includes('out');
+        const typeBadge = isOut
           ? '<span class="badge bg-danger">出</span>'
           : '<span class="badge bg-success">入</span>';
-        const qtyColor = l.quantity_change > 0 ? 'text-success' : 'text-danger';
-        const qtySign = l.quantity_change > 0 ? '+' : '';
+
+        // 品項名稱 + 批號（無批號時不顯示括號）
+        const batchPart = l.batch_no ? ` (${escHtml(l.batch_no)})` : '';
+        const itemDisplay = l.item_name ? escHtml(l.item_name) + batchPart : '-';
+
+        // 異動數量帶正負號與單位
+        const qtyColor = amount >= 0 ? 'text-success' : 'text-danger';
+        const qtySign  = amount > 0 ? '+' : '';
+        const qtyDisplay = `${qtySign}${amount} ${escHtml(l.unit || '')}`;
+
+        // 格式化時間（優先用 DB 格式化欄位）
+        const timeStr = l.created_at_formatted || new Date(l.created_at).toLocaleString('zh-TW');
+
         tbody.innerHTML += `
           <tr>
-            <td>${new Date(l.created_at).toLocaleString()}</td>
+            <td style="white-space:nowrap;">${escHtml(timeStr)}</td>
             <td>${escHtml(l.item_type || '-')}</td>
-            <td>${l.item_name ? escHtml(l.item_name) + ' (' + escHtml(l.batch_no) + ')' : '-'}</td>
-            <td>${typeBadge} ${escHtml(l.log_type)}</td>
-            <td class="${qtyColor} fw-bold">${qtySign}${l.quantity_change}</td>
-            <td>${escHtml(l.note || '')}</td>
+            <td>${itemDisplay}</td>
+            <td>${typeBadge} <span class="text-muted" style="font-size:0.78rem;">${escHtml(changeType)}</span></td>
+            <td class="${qtyColor} fw-bold">${qtyDisplay}</td>
+            <td>${escHtml(localizeNote(l.note))}</td>
           </tr>
         `;
       });
@@ -2576,6 +2643,25 @@
     }
   }
 
+  // 月份切換按鈕
+  const btnStockPrevMonth = document.getElementById('btn-stock-prev-month');
+  const btnStockNextMonth = document.getElementById('btn-stock-next-month');
+  if (btnStockPrevMonth) {
+    btnStockPrevMonth.addEventListener('click', () => {
+      currentStockMonth--;
+      if (currentStockMonth < 1) { currentStockMonth = 12; currentStockYear--; }
+      renderStockMonthLabel();
+      loadStockLogs();
+    });
+  }
+  if (btnStockNextMonth) {
+    btnStockNextMonth.addEventListener('click', () => {
+      currentStockMonth++;
+      if (currentStockMonth > 12) { currentStockMonth = 1; currentStockYear++; }
+      renderStockMonthLabel();
+      loadStockLogs();
+    });
+  }
 
 
   // 新增包材耗材領用 - 打開 Modal
@@ -2588,6 +2674,10 @@
       const sel = $('usage-material-select');
       sel.innerHTML = '<option value="">載入中...</option>';
       $('usage-material-info').textContent = '';
+      // 重置防呆狀態
+      if ($('usage-quantity-feedback')) $('usage-quantity-feedback').innerHTML = '';
+      if ($('usage-quantity')) $('usage-quantity').style.borderColor = '';
+      if ($('btn-save-material-usage')) $('btn-save-material-usage').disabled = false;
       
       try {
         const res = await apiFetch('/api/inventory/materials');
@@ -2608,6 +2698,36 @@
     });
   }
 
+  // 即時防呆驗證輔助函式
+  function validateUsageForm() {
+    const selEl = $('usage-material-select');
+    const qtyEl = $('usage-quantity');
+    const feedbackEl = $('usage-quantity-feedback');
+    const submitBtn = $('btn-save-material-usage');
+    if (!selEl || !qtyEl || !feedbackEl || !submitBtn) return;
+
+    const opt = selEl.options[selEl.selectedIndex];
+    const qty = parseFloat(qtyEl.value);
+    const remain = opt && opt.value ? parseFloat(opt.dataset.remain) : null;
+
+    let errorMsg = '';
+    if (!qtyEl.value || isNaN(qty) || qty <= 0) {
+      errorMsg = '領用數量必須大於 0';
+    } else if (remain !== null && qty > remain) {
+      errorMsg = `超過可用庫存量（剩餘 ${remain}${opt.dataset.unit || ''}）`;
+    }
+
+    if (errorMsg) {
+      qtyEl.style.borderColor = '#ef4444';
+      feedbackEl.innerHTML = `<span style="color:#ef4444;">⚠️ ${errorMsg}</span>`;
+      submitBtn.disabled = true;
+    } else {
+      qtyEl.style.borderColor = '';
+      feedbackEl.innerHTML = '';
+      submitBtn.disabled = false;
+    }
+  }
+
   if ($('usage-material-select')) {
     $('usage-material-select').addEventListener('change', (e) => {
       const opt = e.target.options[e.target.selectedIndex];
@@ -2617,7 +2737,12 @@
       } else {
         info.textContent = '';
       }
+      validateUsageForm();
     });
+  }
+
+  if ($('usage-quantity')) {
+    $('usage-quantity').addEventListener('input', validateUsageForm);
   }
 
   if ($('add-material-usage-form')) {

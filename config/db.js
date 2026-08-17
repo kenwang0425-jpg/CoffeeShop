@@ -1563,16 +1563,35 @@ async function createPurchase(purchaseData) {
       
       if (Array.isArray(items) && items.length > 0) {
         for (const item of items) {
-          await client.query(
+          const piResult = await client.query(
             `INSERT INTO purchase_items 
              (purchase_id, item_type, item_name, item_code, batch_no, origin, variety, altitude, process_method, flavor_description, quantity, remaining_quantity, unit, unit_price, subtotal)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+             RETURNING id`,
             [
               purchaseId, item.item_type, item.item_name, item.item_code || null, item.batch_no || null,
               item.origin || null, item.variety || null, item.altitude || null, item.process_method || null, 
               item.flavor_description || null, item.quantity, item.quantity, item.unit, item.unit_price, item.subtotal
             ]
           );
+          // 若狀態為已入庫 (completed)，同步寫入庫存流水帳
+          if ((status || 'completed') === 'completed') {
+            const newItemId = piResult.rows[0].id;
+            await client.query(
+              `INSERT INTO stock_logs (item_type, purchase_item_id, item_name, batch_no, change_type, change_amount, unit, note)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+              [
+                item.item_type,
+                newItemId,
+                item.item_name,
+                item.batch_no || null,
+                'purchase_in',
+                Number(item.quantity),
+                item.unit,
+                `進貨入庫 (單號: ${purchaseId})`
+              ]
+            );
+          }
         }
       }
       
@@ -1863,15 +1882,46 @@ async function addRoastRecord(data) {
 // ============================================================
 // Material Usages (包材/耗材領用紀錄)
 // ============================================================
-async function getMaterialUsages() {
+async function getMaterialUsages(year, month) {
   if (pool) {
     try {
-      const result = await pool.query(`
-        SELECT m.*, p.item_name, p.unit
+      let query = `
+        SELECT m.id,
+               m.purchase_item_id,
+               m.usage_type,
+               m.quantity,
+               TO_CHAR(m.usage_date, 'YYYY-MM-DD') AS usage_date,
+               m.note,
+               m.created_at,
+               p.item_name,
+               p.unit
         FROM material_usages m
         LEFT JOIN purchase_items p ON m.purchase_item_id = p.id
-        ORDER BY m.created_at DESC
-      `);
+        WHERE 1=1
+      `;
+      const params = [];
+
+      if (year && month) {
+        const y = parseInt(year, 10);
+        const mVal = parseInt(month, 10);
+        if (!isNaN(y) && !isNaN(mVal) && mVal >= 1 && mVal <= 12) {
+          const mStr = String(mVal).padStart(2, '0');
+          const startDate = `${y}-${mStr}-01`;
+          const nextY = mVal === 12 ? y + 1 : y;
+          const nextM = mVal === 12 ? 1 : mVal + 1;
+          const nextMStr = String(nextM).padStart(2, '0');
+          const endDate = `${nextY}-${nextMStr}-01`;
+
+          params.push(startDate);
+          query += ` AND m.usage_date >= $${params.length}`;
+          params.push(endDate);
+          query += ` AND m.usage_date < $${params.length}`;
+        }
+      }
+
+      query += ` ORDER BY m.usage_date DESC, m.created_at DESC`;
+
+      const result = await pool.query(query, params);
       return result.rows;
     } catch (err) {
       console.error('PostgreSQL getMaterialUsages 錯誤:', err.message);
@@ -1902,6 +1952,9 @@ async function addMaterialUsage(data) {
       const remaining = Number(remaining_quantity);
 
       // 2. 防呆檢查
+      if (isNaN(used_qty) || used_qty <= 0) {
+        throw new Error('領用數量必須為大於 0 的有效數值！');
+      }
       if (remaining < used_qty) {
         throw new Error(`物料「${item_name}」庫存不足，無法領用！`);
       }
@@ -1946,10 +1999,48 @@ async function addMaterialUsage(data) {
 // ============================================================
 // Stock Logs (全物料庫存異動歷程)
 // ============================================================
-async function getStockLogs() {
+async function getStockLogs(year, month) {
   if (pool) {
     try {
-      const result = await pool.query('SELECT * FROM stock_logs ORDER BY created_at DESC');
+      let query = `
+        SELECT 
+          id,
+          item_type,
+          purchase_item_id,
+          item_name,
+          batch_no,
+          change_type,
+          change_amount,
+          unit,
+          note,
+          TO_CHAR(created_at, 'YYYY-MM-DD HH24:MI:SS') AS created_at_formatted,
+          created_at
+        FROM stock_logs
+        WHERE 1=1
+      `;
+      const params = [];
+
+      if (year && month) {
+        const y = parseInt(year, 10);
+        const mVal = parseInt(month, 10);
+        if (!isNaN(y) && !isNaN(mVal) && mVal >= 1 && mVal <= 12) {
+          const mStr = String(mVal).padStart(2, '0');
+          const startDate = `${y}-${mStr}-01`;
+          const nextY = mVal === 12 ? y + 1 : y;
+          const nextM = mVal === 12 ? 1 : mVal + 1;
+          const nextMStr = String(nextM).padStart(2, '0');
+          const endDate = `${nextY}-${nextMStr}-01`;
+
+          params.push(startDate);
+          query += ` AND created_at >= $${params.length}`;
+          params.push(endDate);
+          query += ` AND created_at < $${params.length}`;
+        }
+      }
+
+      query += ` ORDER BY created_at DESC`;
+
+      const result = await pool.query(query, params);
       return result.rows;
     } catch (err) {
       console.error('PostgreSQL getStockLogs 錯誤:', err.message);

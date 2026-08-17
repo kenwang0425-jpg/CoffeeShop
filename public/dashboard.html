@@ -369,7 +369,14 @@
 
               <!-- Tab 2: 包耗材領用 -->
               <div class="tab-pane fade" id="pane-material-usages" role="tabpanel">
-                <div class="d-flex justify-content-end mb-3">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                  <!-- 月份切換器 -->
+                  <div class="d-flex align-items-center gap-1 rounded-pill px-3 py-1" style="border:1px solid #4a4a6a;background:rgba(255,255,255,0.03);min-width:180px;">
+                    <button type="button" id="btn-material-prev-month" class="btn btn-sm text-light p-0 border-0" style="font-size:1rem;line-height:1;">&lt;</button>
+                    <span id="material-current-month-label" class="text-warning fw-bold mx-auto" style="font-size:0.9rem;white-space:nowrap;">&#128197; 載入中</span>
+                    <button type="button" id="btn-material-next-month" class="btn btn-sm text-light p-0 border-0" style="font-size:1rem;line-height:1;">&gt;</button>
+                  </div>
+                  <!-- 新增按鈕 -->
                   <button class="btn btn-custom-primary" id="btn-add-material-usage">
                     <i class="bi bi-plus-circle-fill"></i> 新增領用紀錄
                   </button>
@@ -392,6 +399,14 @@
 
               <!-- Tab 3: 庫存歷程 -->
               <div class="tab-pane fade" id="pane-stock-logs" role="tabpanel">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                  <!-- 月份切換器 -->
+                  <div class="d-flex align-items-center gap-1 rounded-pill px-3 py-1" style="border:1px solid #4a4a6a;background:rgba(255,255,255,0.03);min-width:180px;">
+                    <button type="button" id="btn-stock-prev-month" class="btn btn-sm text-light p-0 border-0" style="font-size:1rem;line-height:1;">&lt;</button>
+                    <span id="stock-current-month-label" class="text-warning fw-bold mx-auto" style="font-size:0.9rem;white-space:nowrap;">&#128197; 載入中</span>
+                    <button type="button" id="btn-stock-next-month" class="btn btn-sm text-light p-0 border-0" style="font-size:1rem;line-height:1;">&gt;</button>
+                  </div>
+                </div>
                 <div class="table-responsive">
                   <table class="table custom-table">
                     <thead>
@@ -854,7 +869,8 @@
               </div>
               <div class="col-12 col-md-6">
                 <label class="form-label form-label-custom">數量 <span class="text-danger">*</span></label>
-                <input type="number" class="form-control form-control-custom" id="usage-quantity" min="1" step="any" required>
+                <input type="number" class="form-control form-control-custom" id="usage-quantity" min="0.01" step="any" required>
+                <div id="usage-quantity-feedback" class="mt-1" style="font-size:0.82rem;"></div>
               </div>
             </div>
             <div class="mb-3">
