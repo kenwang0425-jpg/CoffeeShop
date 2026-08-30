@@ -1291,3 +1291,17 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .supplier-rating-input .star-select:hover {
   transform: scale(1.15);
 }
+
+/* 確保深色主題下的 select option 均為深底淺字 */
+#product-source-selector,
+#product-source-selector option {
+  background-color: #1e1e2f !important;
+  color: #e0e0e0 !important;
+}
+
+#product-source-selector option:hover,
+#product-source-selector option:focus,
+#product-source-selector option:checked {
+  background-color: #3b3b54 !important;
+  color: #ffffff !important;
+}

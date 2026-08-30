@@ -162,6 +162,16 @@ router.get('/', async (req, res) => {
   }
 });
 
+// GET /api/products/roast-bean-options
+router.get('/roast-bean-options', async (req, res) => {
+  try {
+    const data = await db.getRoastBeanOptions();
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, message: '取得烘豆/生豆選項失敗：' + err.message });
+  }
+});
+
 // GET /api/products/:productID
 router.get('/:productID', async (req, res) => {
   try {

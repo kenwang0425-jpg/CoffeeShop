@@ -24,12 +24,6 @@
         </div>
       </div>
       <ul class="sidebar-menu">
-        <li class="menu-item active" id="menu-products">
-          <a href="#">
-            <i class="bi bi-grid-1x2-fill"></i>
-            <span>商品管理</span>
-          </a>
-        </li>
         <li class="menu-item" id="menu-orders">
           <a href="#" style="justify-content:flex-start;">
             <i class="bi bi-receipt-cutoff"></i>
@@ -37,22 +31,10 @@
             <span class="sidebar-badge d-none" id="sidebar-pending-badge">0</span>
           </a>
         </li>
-        <li class="menu-item" id="menu-ordering">
+        <li class="menu-item active" id="menu-products">
           <a href="#">
-            <i class="bi bi-journal-text"></i>
-            <span>📝 訂購方式管理</span>
-          </a>
-        </li>
-        <li class="menu-item" id="menu-suppliers">
-          <a href="#">
-            <i class="bi bi-truck"></i>
-            <span>進貨商管理</span>
-          </a>
-        </li>
-        <li class="menu-item" id="menu-purchases">
-          <a href="#">
-            <i class="bi bi-clipboard-check"></i>
-            <span>進貨管理</span>
+            <i class="bi bi-grid-1x2-fill"></i>
+            <span>商品管理</span>
           </a>
         </li>
         <li class="menu-item" id="menu-inventory">
@@ -61,10 +43,37 @@
             <span>庫存與烘豆</span>
           </a>
         </li>
+        <li class="menu-item" id="menu-purchases">
+          <a href="#">
+            <i class="bi bi-clipboard-check"></i>
+            <span>進貨管理</span>
+          </a>
+        </li>
+        <li class="menu-item" id="menu-suppliers">
+          <a href="#">
+            <i class="bi bi-truck"></i>
+            <span>進貨商管理</span>
+          </a>
+        </li>
+        
+        <hr class="my-2 mx-3" style="border-top: 1px dashed #C5A880; opacity: 0.4;">
+        
         <li class="menu-item" id="menu-business-hours">
           <a href="#">
             <i class="bi bi-clock-fill"></i>
-            <span>🕒 營業時間</span>
+            <span>營業時間</span>
+          </a>
+        </li>
+        <li class="menu-item" id="menu-ordering">
+          <a href="#">
+            <i class="bi bi-journal-text"></i>
+            <span>訂購方式管理</span>
+          </a>
+        </li>
+        <li class="menu-item" id="menu-users">
+          <a href="#">
+            <i class="bi bi-people"></i>
+            <span>使用者管理</span>
           </a>
         </li>
       </ul>
@@ -76,6 +85,9 @@
             <div class="user-role">系統管理員</div>
           </div>
         </div>
+        <button class="btn btn-outline-info btn-sm w-100 mt-3" data-bs-toggle="modal" data-bs-target="#change-password-modal">
+          <i class="bi bi-shield-lock me-2"></i>變更密碼
+        </button>
         <button class="btn btn-outline-danger btn-sm w-100 mt-2" id="btn-logout">
           <i class="bi bi-box-arrow-right me-2"></i>登出系統
         </button>
@@ -318,7 +330,7 @@
                     </select>
                   </div>
                   <div class="col-md-9">
-                    <input type="text" id="overview-keyword-filter" class="form-control" placeholder="搜尋品項名稱...">
+                    <input type="text" id="overview-keyword-filter" class="form-control" placeholder="搜尋品項名稱、產區、批號...">
                   </div>
                 </div>
                 <div class="table-responsive">
@@ -326,7 +338,7 @@
                     <thead>
                       <tr>
                         <th>物料類型</th>
-                        <th>品項名稱</th>
+                        <th>品項名稱 / 產區 (批號)</th>
                         <th>剩餘總庫存</th>
                         <th>單位</th>
                       </tr>
@@ -399,13 +411,29 @@
 
               <!-- Tab 3: 庫存歷程 -->
               <div class="tab-pane fade" id="pane-stock-logs" role="tabpanel">
-                <div class="d-flex justify-content-between align-items-center mb-3">
+                <div class="d-flex align-items-center flex-wrap gap-2 mb-3">
                   <!-- 月份切換器 -->
-                  <div class="d-flex align-items-center gap-1 rounded-pill px-3 py-1" style="border:1px solid #4a4a6a;background:rgba(255,255,255,0.03);min-width:180px;">
+                  <div class="stock-month-picker d-flex align-items-center justify-content-between px-3 py-1 rounded-pill" style="border: 1px solid #4a4a6a; min-width: 170px; background: rgba(255,255,255,0.03);">
                     <button type="button" id="btn-stock-prev-month" class="btn btn-sm text-light p-0 border-0" style="font-size:1rem;line-height:1;">&lt;</button>
-                    <span id="stock-current-month-label" class="text-warning fw-bold mx-auto" style="font-size:0.9rem;white-space:nowrap;">&#128197; 載入中</span>
+                    <span id="stock-current-month-label" class="text-warning fw-bold mx-2" style="font-size:0.9rem;white-space:nowrap;">&#128197; 載入中</span>
                     <button type="button" id="btn-stock-next-month" class="btn btn-sm text-light p-0 border-0" style="font-size:1rem;line-height:1;">&gt;</button>
                   </div>
+
+                  <!-- 物料類型篩選 -->
+                  <select id="stock-filter-item-type" class="form-select form-select-sm text-light border-secondary" style="width: auto; background-color: #1e1e2f;">
+                    <option value="all">全部物料</option>
+                    <option value="生豆">生豆</option>
+                    <option value="包材">包材</option>
+                    <option value="耗材">耗材</option>
+                    <option value="其他">其他</option>
+                  </select>
+
+                  <!-- 異動類型篩選 -->
+                  <select id="stock-filter-action" class="form-select form-select-sm text-light border-secondary" style="width: auto; background-color: #1e1e2f;">
+                    <option value="all">全部異動 (入/出)</option>
+                    <option value="in">僅看入庫 (+)</option>
+                    <option value="out">僅看出庫 (-)</option>
+                  </select>
                 </div>
                 <div class="table-responsive">
                   <table class="table custom-table">
@@ -488,6 +516,42 @@
           </div>
         </div>
 
+        <!-- ════ 使用者管理區塊 ════ -->
+        <div id="section-users" class="d-none">
+          <div class="glass-card">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+              <h5 class="text-info fw-bold mb-0"><i class="bi bi-people me-2"></i>使用者管理</h5>
+              <button class="btn btn-custom-primary" id="btn-add-user">
+                <i class="bi bi-plus-lg me-1"></i> 新增使用者
+              </button>
+            </div>
+            
+            <div class="table-responsive">
+              <table class="table table-dark table-hover align-middle custom-table">
+                <thead>
+                  <tr>
+                    <th>帳號 (Username)</th>
+                    <th>顯示名稱</th>
+                    <th>角色</th>
+                    <th>狀態</th>
+                    <th>建立時間</th>
+                    <th class="text-end">操作</th>
+                  </tr>
+                </thead>
+                <tbody id="users-tbody">
+                  <!-- JS 動態載入 -->
+                </tbody>
+              </table>
+              <div id="users-loading" class="text-center py-4 text-secondary d-none">
+                <div class="spinner-border spinner-border-sm me-2" role="status"></div>載入中...
+              </div>
+              <div id="users-empty" class="text-center py-4 text-secondary d-none">
+                尚無使用者資料
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- ── 訂單管理區塊 ── -->
         <div id="section-orders" class="d-none">
           <div class="glass-card">
@@ -564,6 +628,14 @@
         </div>
         <form id="product-form" novalidate>
           <div class="modal-body p-4">
+
+            <!-- 快速帶入資料下拉選單 -->
+            <div class="mb-3 p-2 rounded" style="background: rgba(255, 255, 255, 0.05); border: 1px dashed #6c757d;">
+              <label class="form-label text-warning small mb-1 fw-bold">⚡ 快速從烘豆紀錄 / 生豆資料帶入（選填）</label>
+              <select id="product-source-selector" class="form-select form-select-sm text-light border-secondary" style="background-color: #232338; color: #f8f9fa; border-color: #4a4a6a;">
+                <option value="">-- 手動自訂建立 / 或選擇現有批次快速帶入 --</option>
+              </select>
+            </div>
 
             <!-- ── 列 1：商品編號 & 類別 ── -->
             <div class="row g-3 mb-3">
@@ -1116,6 +1188,94 @@
           <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">取消</button>
           <button type="button" class="btn btn-danger px-4" id="btn-confirm-delete">確認刪除</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 變更密碼 Modal -->
+  <div class="modal fade" id="change-password-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content modal-content-custom">
+        <div class="modal-header modal-header-custom">
+          <h5 class="modal-title modal-title-custom"><i class="bi bi-shield-lock me-2"></i>變更密碼</h5>
+          <button type="button" class="btn-close btn-close-white-custom" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <form id="change-password-form">
+          <div class="modal-body p-4">
+            <div class="mb-3">
+              <label class="form-label form-label-custom">目前密碼</label>
+              <input type="password" class="form-control form-control-custom" id="old-password" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label form-label-custom">新密碼</label>
+              <input type="password" class="form-control form-control-custom" id="new-password" required>
+              <div class="form-text text-light opacity-75 small mt-1">密碼需至少 8 碼，並包含大寫英文、小寫英文、數字、特殊符號中至少三種</div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label form-label-custom">確認新密碼</label>
+              <input type="password" class="form-control form-control-custom" id="confirm-password" required>
+            </div>
+          </div>
+          <div class="modal-footer modal-footer-custom">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">取消</button>
+            <button type="submit" class="btn btn-custom-primary">確認變更</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- 使用者 Modal -->
+  <div class="modal fade" id="user-modal" data-bs-backdrop="static" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content modal-content-custom">
+        <div class="modal-header modal-header-custom">
+          <h5 class="modal-title modal-title-custom" id="user-modal-title">新增使用者</h5>
+          <button type="button" class="btn-close btn-close-white-custom" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <form id="user-form">
+          <div class="modal-body p-4">
+            <input type="hidden" id="user-id">
+            
+            <div class="mb-3">
+              <label class="form-label form-label-custom">帳號 (Username) <span class="text-danger">*</span></label>
+              <input type="text" class="form-control form-control-custom" id="user-username" required>
+            </div>
+            
+            <div class="mb-3">
+              <label class="form-label form-label-custom">顯示名稱 <span class="text-danger">*</span></label>
+              <input type="text" class="form-control form-control-custom" id="user-modal-display-name" required>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label form-label-custom">密碼 <span class="text-danger" id="user-password-asterisk">*</span></label>
+              <input type="password" class="form-control form-control-custom" id="user-password">
+              <div class="form-text text-light opacity-75 small mt-1" id="user-password-hint">
+                新增時必填。密碼需至少 8 碼，並包含大寫英文、小寫英文、數字、特殊符號中至少三種
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label form-label-custom">角色</label>
+              <select class="form-select form-control-custom" id="user-role">
+                <option value="admin">系統管理員 (admin)</option>
+              </select>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label form-label-custom">帳號狀態</label>
+              <select class="form-select form-control-custom" id="user-status">
+                <option value="true">啟用</option>
+                <option value="false">停用</option>
+              </select>
+            </div>
+
+          </div>
+          <div class="modal-footer modal-footer-custom">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">取消</button>
+            <button type="submit" class="btn btn-custom-primary">儲存</button>
+          </div>
+        </form>
       </div>
     </div>
   </div>

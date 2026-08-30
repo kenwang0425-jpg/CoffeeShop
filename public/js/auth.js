@@ -69,6 +69,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // 登入成功，儲存 Token 與使用者資訊至 sessionStorage
         sessionStorage.setItem('token', result.token);
         sessionStorage.setItem('user', JSON.stringify(result.user));
+        sessionStorage.setItem('username', result.user.username);
         
         // 導向至儀表板主畫面
         window.location.href = '/dashboard.html';

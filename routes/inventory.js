@@ -73,8 +73,8 @@ router.post('/usages', async (req, res) => {
 // 7. 取得全物料庫存異動歷程
 router.get('/logs', async (req, res) => {
   try {
-    const { year, month } = req.query;
-    const data = await db.getStockLogs(year, month);
+    const { year, month, item_type, change_action } = req.query;
+    const data = await db.getStockLogs(year, month, item_type, change_action);
     res.json({ success: true, data });
   } catch (err) {
     console.error('取得庫存歷程失敗:', err);
@@ -85,7 +85,8 @@ router.get('/logs', async (req, res) => {
 // 8. 取得庫存總覽
 router.get('/overview', async (req, res) => {
   try {
-    const data = await db.getInventoryOverview();
+    const { type, search } = req.query;
+    const data = await db.getInventoryOverview(type, search);
     res.json({ success: true, data });
   } catch (err) {
     console.error('取得庫存總覽失敗:', err);

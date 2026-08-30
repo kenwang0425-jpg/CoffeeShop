@@ -26,6 +26,7 @@
   const menuSuppliers     = $('menu-suppliers');
   const menuPurchases     = $('menu-purchases');
   const menuInventory     = $('menu-inventory');
+  const menuUsers         = $('menu-users');
 
   // 內容區塊
   const sectionProducts      = $('section-products');
@@ -35,6 +36,7 @@
   const sectionSuppliers     = $('section-suppliers');
   const sectionPurchases     = $('section-purchases');
   const sectionInventory     = $('section-inventory');
+  const sectionUsers         = $('section-users');
 
   // 標題
   const pageTitle    = document.querySelector('.page-title');
@@ -207,14 +209,18 @@
     setTimeout(() => globalAlert.classList.add('d-none'), 4000);
   }
 
+  function showToast(message, type = 'success') {
+    alert(message);
+  }
+
   // ════════════════════════════════════════════════════
   //  Sidebar 導覽切換
   // ════════════════════════════════════════════════════
   function switchSection(section) {
-    // 隱藏全部區塊
-    [sectionProducts, sectionOrdering, sectionBusinessHours, sectionOrders, sectionSuppliers, sectionPurchases, sectionInventory]
+    // 隱藏區塊
+    [sectionProducts, sectionOrdering, sectionBusinessHours, sectionOrders, sectionSuppliers, sectionPurchases, sectionInventory, sectionUsers]
       .forEach(s => { if (s) s.classList.add('d-none'); });
-    [menuProducts, menuOrdering, menuBusinessHours, menuOrders, menuSuppliers, menuPurchases, menuInventory]
+    [menuProducts, menuOrdering, menuBusinessHours, menuOrders, menuSuppliers, menuPurchases, menuInventory, menuUsers]
       .forEach(m => { if (m) m.classList.remove('active'); });
 
     // 離開訂單頁時停止輪詢
@@ -272,9 +278,9 @@
       loadSupplierOptions();
       loadPurchases();
     } else if (section === 'inventory') {
-      if (sectionInventory) sectionInventory.classList.remove('d-none');
-      if (menuInventory) menuInventory.classList.add('active');
-      if (pageTitle) pageTitle.textContent = '庫存與烘豆管理';
+      sectionInventory.classList.remove('d-none');
+      menuInventory.classList.add('active');
+      if (pageTitle) pageTitle.textContent = '庫存管理';
       loadInventoryOverview();
       renderRoastMonthLabel();
       loadRoastRecords();
@@ -282,6 +288,11 @@
       loadMaterialUsages();
       renderStockMonthLabel();
       loadStockLogs();
+    } else if (section === 'users') {
+      sectionUsers.classList.remove('d-none');
+      menuUsers.classList.add('active');
+      if (pageTitle) pageTitle.textContent = '使用者管理';
+      loadUsersList();
     }
   }
 
@@ -292,6 +303,7 @@
   if (menuSuppliers) menuSuppliers.querySelector('a').addEventListener('click', e => { e.preventDefault(); switchSection('suppliers'); });
   if (menuPurchases) menuPurchases.querySelector('a').addEventListener('click', e => { e.preventDefault(); switchSection('purchases'); });
   if (menuInventory) menuInventory.querySelector('a').addEventListener('click', e => { e.preventDefault(); switchSection('inventory'); });
+  if (menuUsers) menuUsers.querySelector('a').addEventListener('click', e => { e.preventDefault(); switchSection('users'); });
 
   // ════════════════════════════════════════════════════
   //  登出
@@ -303,6 +315,46 @@
   }
   if (btnLogout)       btnLogout.addEventListener('click', doLogout);
   if (btnLogoutMobile) btnLogoutMobile.addEventListener('click', doLogout);
+
+  // 變更密碼
+  const changePasswordForm = $('change-password-form');
+  if (changePasswordForm) {
+    changePasswordForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const oldPassword = $('old-password').value;
+      const newPassword = $('new-password').value;
+      const confirmPassword = $('confirm-password').value;
+
+      if (newPassword !== confirmPassword) {
+        alert('新密碼與確認密碼不相符！');
+        return;
+      }
+
+      const username = sessionStorage.getItem('username');
+      if (!username) {
+        alert('無法取得使用者帳號，請重新登入！');
+        doLogout();
+        return;
+      }
+
+      try {
+        const res = await apiFetch('/api/auth/change-password', {
+          method: 'POST',
+          body: JSON.stringify({ username, oldPassword, newPassword })
+        });
+        
+        alert('密碼變更成功！請使用新密碼重新登入。');
+        
+        const modal = bootstrap.Modal.getInstance($('change-password-modal'));
+        if (modal) modal.hide();
+        
+        doLogout(); // 變更成功後強制登出
+      } catch (err) {
+        console.error('變更密碼失敗:', err);
+        alert(err.message || '變更密碼失敗，請稍後再試。');
+      }
+    });
+  }
 
   // ════════════════════════════════════════════════════
   //  使用者名稱顯示
@@ -473,6 +525,25 @@
   //  新增/編輯商品 Modal
   // ════════════════════════════════════════════════════
 
+  let roastBeanOptions = [];
+  async function loadRoastBeanOptions() {
+    try {
+      const res = await apiFetch('/api/products/roast-bean-options');
+      roastBeanOptions = res.data || [];
+      const selector = $('product-source-selector');
+      if (selector) {
+        selector.innerHTML = '<option value="">-- 手動自訂建立 / 或選擇現有批次快速帶入 --</option>';
+        roastBeanOptions.forEach(opt => {
+          const label = `[${opt.batch_no}] ${opt.origin || ''} ${opt.item_name || ''} (${opt.processing_method || ''})`;
+          selector.innerHTML += `<option value="${opt.batch_no}">${escHtml(label)}</option>`;
+        });
+        selector.value = '';
+      }
+    } catch (err) {
+      console.error('載入生豆/烘豆選項失敗:', err);
+    }
+  }
+
   function openAddModal() {
     currentEditID = null;
     productModalTitle.textContent = '新增商品';
@@ -483,7 +554,43 @@
     fldProductId.classList.remove('is-invalid-custom');
     $('product-code-help').textContent = '編號儲存後不可修改。';
     renderRecipeRows([]);
+    loadRoastBeanOptions(); // 載入快速帶入選項
     if (productModalBS) productModalBS.show();
+  }
+
+  const productSourceSelector = $('product-source-selector');
+  if (productSourceSelector) {
+    productSourceSelector.addEventListener('change', (e) => {
+      const batchNo = e.target.value;
+      if (!batchNo) {
+        // 切回手動自訂建立，清空所有相關欄位
+        if (fldProductId) fldProductId.value = '';
+        if (fldOrigin) fldOrigin.value = '';
+        if (fldEstate) fldEstate.value = '';
+        if (fldProcessMethod) fldProcessMethod.value = '';
+        if (fldFlavor) fldFlavor.value = '';
+        if (typeof updateNamePreview === 'function') {
+          updateNamePreview();
+        }
+        return;
+      }
+      
+      const opt = roastBeanOptions.find(o => o.batch_no === batchNo);
+      if (opt) {
+        if (fldProductId) fldProductId.value = opt.batch_no || '';
+        if (fldOrigin) fldOrigin.value = opt.origin || '';
+        if (fldEstate) fldEstate.value = opt.item_name || '';
+        if (fldProcessMethod) fldProcessMethod.value = opt.processing_method || '';
+        if (fldFlavor) fldFlavor.value = opt.description || '';
+        if (fldCategory) {
+          fldCategory.value = '咖啡豆';
+          toggleCategoryFields('咖啡豆');
+        }
+        if (typeof updateNamePreview === 'function') {
+          updateNamePreview();
+        }
+      }
+    });
   }
 
   async function openEditModal(productID) {
@@ -2430,12 +2537,18 @@
 
   let currentOverviewData = [];
 
-  if ($('overview-type-filter')) $('overview-type-filter').addEventListener('change', renderOverviewTable);
-  if ($('overview-keyword-filter')) $('overview-keyword-filter').addEventListener('input', renderOverviewTable);
+  let inventoryOverviewTimeout = null;
+  if ($('overview-type-filter')) $('overview-type-filter').addEventListener('change', loadInventoryOverview);
+  if ($('overview-keyword-filter')) $('overview-keyword-filter').addEventListener('input', () => {
+    clearTimeout(inventoryOverviewTimeout);
+    inventoryOverviewTimeout = setTimeout(loadInventoryOverview, 300);
+  });
 
   async function loadInventoryOverview() {
     try {
-      const res = await apiFetch('/api/inventory/overview');
+      const typeFilter = $('overview-type-filter') ? $('overview-type-filter').value : '';
+      const keywordFilter = $('overview-keyword-filter') ? $('overview-keyword-filter').value.trim() : '';
+      const res = await apiFetch(`/api/inventory/overview?type=${encodeURIComponent(typeFilter)}&search=${encodeURIComponent(keywordFilter)}`);
       currentOverviewData = res.data || [];
       renderOverviewTable();
     } catch (err) {
@@ -2449,31 +2562,30 @@
     if (!tbody) return;
     tbody.innerHTML = '';
 
-    const typeFilter = $('overview-type-filter') ? $('overview-type-filter').value : '';
-    const keywordFilter = $('overview-keyword-filter') ? $('overview-keyword-filter').value.toLowerCase().trim() : '';
-
-    const filteredData = currentOverviewData.filter(item => {
-      const matchType = typeFilter === '' || item.item_type === typeFilter;
-      const matchKeyword = keywordFilter === '' || item.item_name.toLowerCase().includes(keywordFilter);
-      return matchType && matchKeyword;
-    });
-
-    if (filteredData.length === 0) {
+    if (currentOverviewData.length === 0) {
       tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-4">無符合條件的庫存資料</td></tr>';
       return;
     }
 
-    filteredData.forEach(item => {
+    currentOverviewData.forEach(item => {
       let badgeClass = 'bg-secondary';
       if (item.item_type === '生豆') badgeClass = 'bg-success';
       else if (item.item_type === '包材') badgeClass = 'bg-info text-dark';
       else if (item.item_type === '耗材') badgeClass = 'bg-warning text-dark';
       
+      let nameDisplay = `<span class="fw-bold">${escHtml(item.item_name)}</span>`;
+      if (item.item_type === '生豆' && item.origin) {
+         nameDisplay = `<span class="badge bg-secondary me-1">${escHtml(item.origin)}</span> ${nameDisplay}`;
+      }
+      if (item.batch_no) {
+         nameDisplay += ` <span class="text-secondary small">(${escHtml(item.batch_no)})</span>`;
+      }
+
       tbody.innerHTML += `
         <tr>
           <td><span class="badge ${badgeClass}">${escHtml(item.item_type)}</span></td>
-          <td class="fw-bold">${escHtml(item.item_name)}</td>
-          <td class="fs-5 ${item.total_remaining > 0 ? 'text-primary' : 'text-danger'}">${item.total_remaining}</td>
+          <td>${nameDisplay}</td>
+          <td class="fs-5 ${item.remaining_quantity > 0 ? 'text-primary' : 'text-danger'}">${item.remaining_quantity}</td>
           <td>${escHtml(item.unit)}</td>
         </tr>
       `;
@@ -2590,7 +2702,9 @@
 
   async function loadStockLogs() {
     try {
-      const res = await apiFetch(`/api/inventory/logs?year=${currentStockYear}&month=${currentStockMonth}`);
+      const itemType = document.getElementById('stock-filter-item-type').value;
+      const changeAction = document.getElementById('stock-filter-action').value;
+      const res = await apiFetch(`/api/inventory/logs?year=${currentStockYear}&month=${currentStockMonth}&item_type=${itemType}&change_action=${changeAction}`);
       const tbody = $('stock-logs-body');
       if (!tbody) return;
       tbody.innerHTML = '';
@@ -2611,8 +2725,8 @@
         // 出入判斷：負數或含 out 為出；正數或含 in 為入
         const isOut = amount < 0 || changeType.includes('out');
         const typeBadge = isOut
-          ? '<span class="badge bg-danger">出</span>'
-          : '<span class="badge bg-success">入</span>';
+          ? '<span class="badge bg-danger rounded-circle p-1">出</span>'
+          : '<span class="badge bg-success rounded-circle p-1">入</span>';
 
         // 品項名稱 + 批號（無批號時不顯示括號）
         const batchPart = l.batch_no ? ` (${escHtml(l.batch_no)})` : '';
@@ -2631,7 +2745,7 @@
             <td style="white-space:nowrap;">${escHtml(timeStr)}</td>
             <td>${escHtml(l.item_type || '-')}</td>
             <td>${itemDisplay}</td>
-            <td>${typeBadge} <span class="text-muted" style="font-size:0.78rem;">${escHtml(changeType)}</span></td>
+            <td>${typeBadge}</td>
             <td class="${qtyColor} fw-bold">${qtyDisplay}</td>
             <td>${escHtml(localizeNote(l.note))}</td>
           </tr>
@@ -2662,6 +2776,11 @@
       loadStockLogs();
     });
   }
+
+  const stockFilterItemType = document.getElementById('stock-filter-item-type');
+  const stockFilterAction = document.getElementById('stock-filter-action');
+  if (stockFilterItemType) stockFilterItemType.addEventListener('change', loadStockLogs);
+  if (stockFilterAction) stockFilterAction.addEventListener('change', loadStockLogs);
 
 
   // 新增包材耗材領用 - 打開 Modal
@@ -2778,6 +2897,160 @@
     return String(str ?? '').replace(/[&<>"']/g, c => ({
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
     }[c]));
+  }
+
+  // ════════════════════════════════════════════════════
+  //  使用者管理
+  // ════════════════════════════════════════════════════
+  const usersTbody = $('users-tbody');
+  const usersLoading = $('users-loading');
+  const usersEmpty = $('users-empty');
+  const btnAddUser = $('btn-add-user');
+  const userForm = $('user-form');
+  let userModalBS = null;
+
+  async function loadUsersList() {
+    if (!usersTbody) return;
+    usersTbody.innerHTML = '';
+    usersLoading.classList.remove('d-none');
+    usersEmpty.classList.add('d-none');
+
+    try {
+      const res = await apiFetch('/api/admin/users');
+      usersLoading.classList.add('d-none');
+
+      if (!res.data || res.data.length === 0) {
+        usersEmpty.classList.remove('d-none');
+        return;
+      }
+
+      res.data.forEach(user => {
+        const tr = document.createElement('tr');
+        const isActiveStr = user.is_active ? '<span class="badge bg-success">啟用</span>' : '<span class="badge bg-danger">停用</span>';
+        const dateStr = new Date(user.created_at).toLocaleDateString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' });
+        
+        tr.innerHTML = `
+          <td>${user.username}</td>
+          <td>${user.display_name}</td>
+          <td>${user.role}</td>
+          <td>${isActiveStr}</td>
+          <td>${dateStr}</td>
+          <td class="text-end">
+            <button class="btn btn-sm btn-outline-info me-1 btn-edit-user">
+              <i class="bi bi-pencil"></i>
+            </button>
+            <button class="btn btn-sm btn-outline-danger btn-delete-user">
+              <i class="bi bi-trash"></i>
+            </button>
+          </td>
+        `;
+        
+        tr.querySelector('.btn-edit-user').addEventListener('click', () => openUserModal(user));
+        tr.querySelector('.btn-delete-user').addEventListener('click', () => deleteUser(user.id, user.username));
+        usersTbody.appendChild(tr);
+      });
+    } catch (err) {
+      console.error(err);
+      usersLoading.classList.add('d-none');
+      showToast('載入使用者失敗', 'danger');
+    }
+  }
+
+  function openUserModal(user = null) {
+    if (userForm) userForm.reset();
+    if (user) {
+      $('user-modal-title').textContent = '編輯使用者';
+      $('user-id').value = user.id;
+      $('user-username').value = user.username;
+      $('user-username').disabled = true; // 編輯時不可改帳號
+      const displayNameInput = $('user-modal-display-name') || $('user-display-name');
+      if (displayNameInput) displayNameInput.value = user.display_name || user.displayName || '';
+      $('user-role').value = user.role;
+      $('user-status').value = user.is_active ? 'true' : 'false';
+      $('user-password').required = false;
+      $('user-password-asterisk').classList.add('d-none');
+      $('user-password-hint').textContent = '若不修改密碼請留空。密碼需至少 8 碼，並包含大寫英文、小寫英文、數字、特殊符號中至少三種';
+    } else {
+      $('user-modal-title').textContent = '新增使用者';
+      $('user-id').value = '';
+      $('user-username').value = '';
+      $('user-username').disabled = false;
+      const displayNameInput = $('user-modal-display-name') || $('user-display-name');
+      if (displayNameInput) displayNameInput.value = '';
+      $('user-password').required = true;
+      $('user-password-asterisk').classList.remove('d-none');
+      $('user-password-hint').textContent = '新增時必填。密碼需至少 8 碼，並包含大寫英文、小寫英文、數字、特殊符號中至少三種';
+    }
+    const modalEl = $('user-modal');
+    if (!userModalBS && modalEl) userModalBS = new bootstrap.Modal(modalEl);
+    if (userModalBS) userModalBS.show();
+  }
+
+  if (btnAddUser) btnAddUser.addEventListener('click', () => openUserModal(null));
+
+  if (userForm) {
+    userForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const id = $('user-id').value;
+      const username = $('user-username').value;
+      const displayNameInput = $('user-modal-display-name') || $('user-display-name');
+      const display_name = displayNameInput ? displayNameInput.value.trim() : '';
+      const password = $('user-password').value;
+      const role = $('user-role').value;
+      const is_active = $('user-status').value === 'true';
+
+      const payload = { display_name, displayName: display_name, role, is_active };
+      if (!id) {
+        payload.username = username;
+        payload.password = password;
+      } else if (password) {
+        payload.new_password = password;
+      }
+
+      try {
+        const url = id ? `/api/admin/users/${id}` : '/api/admin/users';
+        const method = id ? 'PUT' : 'POST';
+        
+        await apiFetch(url, {
+          method,
+          body: JSON.stringify(payload)
+        });
+        
+        showToast(id ? '使用者更新成功' : '使用者建立成功', 'success');
+        if (userModalBS) userModalBS.hide();
+        
+        // 更新左側側邊欄與 Session（若修改自身帳號）
+        if (id) {
+          const currentUsername = sessionStorage.getItem('username');
+          if (username === currentUsername) {
+            sessionStorage.setItem('displayName', display_name);
+            const sidebarNameEl = $('user-display-name');
+            if (sidebarNameEl) sidebarNameEl.textContent = display_name;
+          }
+        }
+        
+        loadUsersList();
+      } catch (err) {
+        alert(err.message);
+      }
+    });
+  }
+
+  async function deleteUser(id, username) {
+    if (!confirm(`確定要刪除使用者 ${username} 嗎？此動作將會停用該帳號。`)) return;
+    
+    try {
+      await apiFetch(`/api/admin/users/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'x-username': sessionStorage.getItem('username')
+        }
+      });
+      showToast('使用者已刪除', 'success');
+      loadUsersList();
+    } catch (err) {
+      alert(err.message);
+    }
   }
 
   // ════════════════════════════════════════════════════

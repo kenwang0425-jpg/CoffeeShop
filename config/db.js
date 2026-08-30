@@ -248,6 +248,17 @@ async function initializeDB() {
 
     // 建立資料表 (PostgreSQL 語法)
     const createTableQuery = `
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        username VARCHAR(50) UNIQUE NOT NULL,
+        password_hash VARCHAR(255) NOT NULL,
+        display_name VARCHAR(100) NOT NULL,
+        role VARCHAR(20) DEFAULT 'admin',
+        is_active BOOLEAN DEFAULT true,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
       CREATE TABLE IF NOT EXISTS Products (
         ProductID         VARCHAR(20)   NOT NULL PRIMARY KEY,
         Category          VARCHAR(20)   NOT NULL,
@@ -1999,7 +2010,7 @@ async function addMaterialUsage(data) {
 // ============================================================
 // Stock Logs (全物料庫存異動歷程)
 // ============================================================
-async function getStockLogs(year, month) {
+async function getStockLogs(year, month, itemType, changeAction) {
   if (pool) {
     try {
       let query = `
@@ -2020,6 +2031,7 @@ async function getStockLogs(year, month) {
       `;
       const params = [];
 
+      // 月份篩選
       if (year && month) {
         const y = parseInt(year, 10);
         const mVal = parseInt(month, 10);
@@ -2036,6 +2048,19 @@ async function getStockLogs(year, month) {
           params.push(endDate);
           query += ` AND created_at < $${params.length}`;
         }
+      }
+
+      // 物料類型篩選
+      if (itemType && itemType !== 'all') {
+        params.push(itemType);
+        query += ` AND item_type = $${params.length}`;
+      }
+
+      // 異動類型篩選
+      if (changeAction === 'in') {
+        query += ` AND (change_amount > 0 OR change_type LIKE '%in%')`;
+      } else if (changeAction === 'out') {
+        query += ` AND (change_amount < 0 OR change_type LIKE '%out%')`;
       }
 
       query += ` ORDER BY created_at DESC`;
@@ -2109,19 +2134,46 @@ async function getAvailableMaterials() {
   return [];
 }
 
-async function getInventoryOverview() {
+async function getInventoryOverview(filterType, searchQuery) {
   if (pool) {
     try {
-      const query = `
-        SELECT item_type, item_name, unit, SUM(remaining_quantity) as total_remaining
-        FROM purchase_items
-        WHERE remaining_quantity > 0
-        GROUP BY item_type, item_name, unit
-        ORDER BY 
-          CASE item_type WHEN '生豆' THEN 1 WHEN '包材' THEN 2 WHEN '耗材' THEN 3 ELSE 4 END,
-          item_name
+      let query = `
+        SELECT 
+          pi.id,
+          pi.item_type,
+          pi.item_name,
+          pi.origin,
+          pi.variety,
+          pi.process_method,
+          pi.batch_no,
+          pi.remaining_quantity,
+          pi.unit,
+          p.purchase_date,
+          s.name AS supplier_name
+        FROM purchase_items pi
+        LEFT JOIN purchases p ON pi.purchase_id = p.id
+        LEFT JOIN suppliers s ON p.supplier_id = s.id
+        WHERE pi.remaining_quantity > 0
       `;
-      const result = await pool.query(query);
+      const params = [];
+
+      if (filterType && filterType !== 'all') {
+        params.push(filterType);
+        query += ` AND pi.item_type = $${params.length}`;
+      }
+
+      if (searchQuery && searchQuery.trim() !== '') {
+        params.push(`%${searchQuery.trim()}%`);
+        query += ` AND (
+          pi.item_name ILIKE $${params.length} OR 
+          pi.origin ILIKE $${params.length} OR 
+          pi.batch_no ILIKE $${params.length}
+        )`;
+      }
+
+      query += ` ORDER BY pi.item_type, pi.item_name, p.purchase_date DESC, pi.id DESC`;
+
+      const result = await pool.query(query, params);
       return result.rows;
     } catch (err) {
       console.error('PostgreSQL getInventoryOverview 錯誤:', err.message);
@@ -2130,7 +2182,175 @@ async function getInventoryOverview() {
   return [];
 }
 
+// 取得生豆與烘豆紀錄選項，用於新增商品快速帶入
+async function getRoastBeanOptions() {
+  if (pool) {
+    try {
+      const query = `
+        SELECT 
+          batch_no,
+          item_name,
+          origin,
+          process_method AS processing_method,
+          variety,
+          flavor_description AS description
+        FROM purchase_items
+        WHERE item_type = '生豆'
+        ORDER BY id DESC
+        LIMIT 50
+      `;
+      const result = await pool.query(query);
+      return result.rows;
+    } catch (err) {
+      console.error('PostgreSQL getRoastBeanOptions 錯誤:', err.message);
+    }
+  }
+  return [];
+}
+
+// ─── 使用者與驗證 ───
+async function getUserByUsername(username) {
+  if (pool) {
+    try {
+      const result = await pool.query('SELECT * FROM users WHERE username = $1 AND is_active = true', [username]);
+      return result.rows[0];
+    } catch (err) {
+      console.error('PostgreSQL getUserByUsername 錯誤:', err.message);
+    }
+  }
+  return null;
+}
+
+async function updateUserPassword(username, newHash) {
+  if (pool) {
+    try {
+      const result = await pool.query(
+        'UPDATE users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE username = $2 RETURNING id',
+        [newHash, username]
+      );
+      return result.rowCount > 0;
+    } catch (err) {
+      console.error('PostgreSQL updateUserPassword 錯誤:', err.message);
+    }
+  }
+  return false;
+}
+
+async function getAllUsers() {
+  if (pool) {
+    try {
+      const result = await pool.query(
+        'SELECT id, username, display_name, role, is_active, created_at, updated_at FROM users ORDER BY id ASC'
+      );
+      return result.rows;
+    } catch (err) {
+      console.error('PostgreSQL getAllUsers 錯誤:', err.message);
+    }
+  }
+  return [];
+}
+
+async function getUserById(id) {
+  if (pool) {
+    try {
+      const result = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
+      return result.rows[0];
+    } catch (err) {
+      console.error('PostgreSQL getUserById 錯誤:', err.message);
+    }
+  }
+  return null;
+}
+
+async function createUser(username, hash, displayName, role) {
+  if (pool) {
+    try {
+      const result = await pool.query(
+        `INSERT INTO users (username, password_hash, display_name, role, is_active) 
+         VALUES ($1, $2, $3, $4, true) RETURNING id`,
+        [username, hash, displayName, role]
+      );
+      return result.rows[0].id;
+    } catch (err) {
+      console.error('PostgreSQL createUser 錯誤:', err.message);
+      throw err;
+    }
+  }
+  return null;
+}
+
+async function updateUser(id, displayName, role, isActive, newHash = null) {
+  if (pool) {
+    try {
+      let queryText = 'UPDATE users SET display_name = $1, role = $2, is_active = $3, updated_at = CURRENT_TIMESTAMP';
+      const params = [displayName, role, isActive];
+      
+      if (newHash) {
+        queryText += ', password_hash = $4';
+        params.push(newHash);
+        queryText += ` WHERE id = $5 RETURNING id`;
+        params.push(id);
+      } else {
+        queryText += ` WHERE id = $4 RETURNING id`;
+        params.push(id);
+      }
+
+      const result = await pool.query(queryText, params);
+      return result.rowCount > 0;
+    } catch (err) {
+      console.error('PostgreSQL updateUser 錯誤:', err.message);
+      throw err;
+    }
+  }
+  return false;
+}
+
+async function deleteUser(id) {
+  if (pool) {
+    try {
+      const result = await pool.query(
+        'UPDATE users SET is_active = false, updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING id',
+        [id]
+      );
+      return result.rowCount > 0;
+    } catch (err) {
+      console.error('PostgreSQL deleteUser 錯誤:', err.message);
+      throw err;
+    }
+  }
+  return false;
+}
+
+async function getActiveAdminCount() {
+  if (pool) {
+    try {
+      const result = await pool.query(
+        "SELECT COUNT(*) as count FROM users WHERE role = 'admin' AND is_active = true"
+      );
+      return parseInt(result.rows[0].count, 10);
+    } catch (err) {
+      console.error('PostgreSQL getActiveAdminCount 錯誤:', err.message);
+    }
+  }
+  return 0;
+}
+
+async function query(text, params) {
+  if (pool) {
+    return pool.query(text, params);
+  }
+  throw new Error("Pool not initialized");
+}
+
+async function closePool() {
+  if (pool) {
+    await pool.end();
+  }
+}
+
 module.exports = {
+  query,
+  closePool,
   initializeDB,
   getProducts, getProductByID, isProductIDExists, addProduct, updateProduct, deleteProduct,
   getOrderingGuide, saveOrderingGuide,
@@ -2144,5 +2364,14 @@ module.exports = {
   getMaterialUsages, addMaterialUsage,
   getStockLogs, addStockLog,
   getAvailableGreenBeans, getAvailableMaterials,
-  getInventoryOverview
+  getInventoryOverview,
+  getRoastBeanOptions,
+  getUserByUsername,
+  updateUserPassword,
+  getAllUsers,
+  getUserById,
+  createUser,
+  updateUser,
+  deleteUser,
+  getActiveAdminCount
 };
